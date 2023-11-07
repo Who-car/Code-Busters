@@ -1,0 +1,22 @@
+$font-path: "../fonts/";
+
+@font-face {
+  font-family: "Visitor Rus";
+  src: url("#{$font-path}Visitor Rus.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Disket Mono";
+  src: url("#{$font-path}Disket-Mono-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Disket Mono";
+  src: url("#{$font-path}Disket-Mono-Bold.ttf") format("truetype");
+  font-weight: bold;
+  font-style: normal;
+}

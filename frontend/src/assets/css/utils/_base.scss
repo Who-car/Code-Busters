@@ -1,0 +1,49 @@
+body::-webkit-scrollbar {
+  display: none;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+#app {
+  height: 100%;
+}
+
+img {
+  pointer-events: none;
+}
+
+.stroke-sm {
+  text-shadow: 
+        -1px -1px 0 #000, 
+        1px -1px 0 #000, 
+        -1px 1px 0 #000, 
+        1px 1px 0 #000;
+}
+
+.stroke-md {
+  text-shadow: 
+        -2px -2px 0 #000, 
+        2px -2px 0 #000, 
+        -2px 2px 0 #000, 
+        2px 2px 0 #000;
+}
+
+.v-enter-active,
+.v-leave-active {
+    transition: opacity 0.15s ease;
+}
+
+.v-enter-from,
+.v-leave-to {
+    opacity: 0;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter, .fade-leave-to {
+  opacity: 0;
+}
