@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CodeBusters", "CodeBusters\CodeBusters.csproj", "{56778616-2289-46D7-990B-4AEEC71B7818}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyAspHelper", "MyAspHelper\MyAspHelper.csproj", "{9A0C1CA4-169C-46DA-8CC4-1C0947AF602A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyOrmHelper", "MyOrmHelper\MyOrmHelper.csproj", "{D930CFF4-AD48-4F85-B83C-F2C54CA81EAF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{56778616-2289-46D7-990B-4AEEC71B7818}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56778616-2289-46D7-990B-4AEEC71B7818}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56778616-2289-46D7-990B-4AEEC71B7818}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56778616-2289-46D7-990B-4AEEC71B7818}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A0C1CA4-169C-46DA-8CC4-1C0947AF602A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A0C1CA4-169C-46DA-8CC4-1C0947AF602A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A0C1CA4-169C-46DA-8CC4-1C0947AF602A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A0C1CA4-169C-46DA-8CC4-1C0947AF602A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D930CFF4-AD48-4F85-B83C-F2C54CA81EAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D930CFF4-AD48-4F85-B83C-F2C54CA81EAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D930CFF4-AD48-4F85-B83C-F2C54CA81EAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D930CFF4-AD48-4F85-B83C-F2C54CA81EAF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
