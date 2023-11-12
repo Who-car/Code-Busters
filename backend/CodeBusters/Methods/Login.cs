@@ -53,8 +53,8 @@ public static partial class Methods
                 response.OutputStream.Close();
                 return;
             }
-            
-            var token = JwtHelper.GenerateToken(user);
+
+            var token = JwtHelper<User>.GenerateToken(user);
         
             body.Success = true;
             body.Token = token;

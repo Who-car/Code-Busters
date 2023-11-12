@@ -4,7 +4,9 @@ public static class TypeExtension
 {
     public static string GetSqlType(this Type type)
     {
-        var name = type.IsArray ? type.Name.Replace("[]", "") : type.Name;
+        var name = type.Name
+            .Replace("[]", "")
+            .Replace("Array", "");
         name = name switch
         {
             "Boolean" => "boolean",
@@ -23,6 +25,8 @@ public static class TypeExtension
             "DateOnly" => "date",
             "TimeOnly" => "time without time zone",
             "TimeSpan" => "interval",
+            "Json" => "jsonb",
+            "JsonArray" => "jsonb[]",
             _ => throw new NotSupportedException()
         };
         return type.IsArray ? string.Concat(name, "[]") : name;

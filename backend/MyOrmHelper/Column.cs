@@ -11,14 +11,14 @@ public class Column
 
     public Column(string name, Type type, bool isPrimary = false)
     {
-        Name = name;
+        Name = string.Join('_', name.Split(' ')).ToLower();
         SqlType = type.GetSqlType();
         PrimaryKey = isPrimary;
     }
 
     public Column(string name, Type type, string referencedTable, string referencedColumn)
     {
-        Name = name;
+        Name = string.Join('_', name.Split(' ')).ToLower();
         SqlType = type.GetSqlType();
         PrimaryKey = false;
         ForeignKey = true;

@@ -1,5 +1,4 @@
-﻿using System.Data;
-using CodeBusters.Models;
+﻿using CodeBusters.Models;
 using MyOrmHelper;
 using Npgsql;
 
@@ -11,7 +10,8 @@ public class DbContext
                                             "Port=5432;" +
                                             "Username=postgres;" +
                                             "Password=ab9q0rui;" +
-                                            "Database=CodeBusters";
+                                            "Database=CodeBusters;" +
+                                            "Include Error Detail = true;";
     private readonly NpgsqlConnection _connection = new(ConnectionString);
 
     public async Task CreateTableAsync<T>(string tableName, Column[] columns)
@@ -33,8 +33,8 @@ public class DbContext
     public async Task AddNewQuizAsync(Quiz quiz)
     {
         await _connection.OpenAsync();
-        var orm = new OrmHelper<Quiz>(_connection);
-        await orm.InsertAsync(quiz);
+        var quizOrm = new OrmHelper<Quiz>(_connection);
+        await quizOrm.InsertAsync(quiz, "quizzes");
         await _connection.CloseAsync();
     }
 
@@ -48,11 +48,11 @@ public class DbContext
         return user;
     }
     
-    public async Task<User> GetUserByIdAsync(Guid id)
+    public async Task<ReturnUser> GetUserByIdAsync(Guid id)
     {
         await _connection.OpenAsync();
         var orm = new OrmHelper<User>(_connection);
-        var user = await orm.SearchWithParamsAsync<User>("id", id);
+        var user = await orm.SearchWithParamsAsync<ReturnUser>("id", id);
         await _connection.CloseAsync();
 
         return user;

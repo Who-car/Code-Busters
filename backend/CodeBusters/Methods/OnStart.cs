@@ -1,4 +1,5 @@
-﻿using CodeBusters.Database;
+﻿using System.Text.Json.Nodes;
+using CodeBusters.Database;
 using CodeBusters.Models;
 using MyOrmHelper;
 
@@ -22,38 +23,39 @@ public static partial class Methods
         {
             new Column("id", typeof(Guid), true),
             new Column("topic", typeof(string)),
-            new Column("author_id", typeof(Guid), "users", "id")
+            new Column("author id", typeof(Guid), "users", "id"),
+            new Column("questions", typeof(JsonArray))
         });
 
-        await db.CreateTableAsync<Question>(tableName: "questions", new[]
-        {
-            new Column("id", typeof(long), true),
-            new Column("question", typeof(string)),
-            new Column("quiz_id", typeof(Guid), "quizzes", "id")
-        });
+        // await db.CreateTableAsync<Question>(tableName: "questions", new[]
+        // {
+        //     new Column("id", typeof(long), true),
+        //     new Column("question", typeof(string)),
+        //     new Column("quiz id", typeof(Guid), "quizzes", "id")
+        // });
+        //
+        // await db.CreateTableAsync<Answer>(tableName: "answers", new[]
+        // {
+        //     new Column("id", typeof(long), true),
+        //     new Column("answer", typeof(string)),
+        //     new Column("is correct", typeof(bool)),
+        //     new Column("question id", typeof(long), "questions", "id")
+        // });
 
-        await db.CreateTableAsync<Answer>(tableName: "answers", new[]
-        {
-            new Column("id", typeof(long), true),
-            new Column("answer", typeof(string)),
-            new Column("is_correct", typeof(bool)),
-            new Column("question_id", typeof(long), "questions", "id")
-        });
-
-        await db.CreateTableAsync<Tag>(tableName: "tags", new[]
-        {
-            new Column("id", typeof(int), true),
-            new Column("label", typeof(string)),
-            new Column("quiz_id", typeof(Guid), "quizzes", "id")
-        });
+        // await db.CreateTableAsync<Tag>(tableName: "tags", new[]
+        // {
+        //     new Column("id", typeof(int), true),
+        //     new Column("label", typeof(string)),
+        //     new Column("quiz id", typeof(Guid), "quizzes", "id")
+        // });
 
         await db.CreateTableAsync<Comment>(tableName: "comments", new[]
         {
             new Column("id", typeof(Guid), true),
             new Column("text", typeof(string)),
             new Column("rating", typeof(double)),
-            new Column("author_id", typeof(Guid), "users", "id"),
-            new Column("quiz_id", typeof(Guid), "quizzes", "id")
+            new Column("author id", typeof(Guid), "users", "id"),
+            new Column("quiz id", typeof(Guid), "quizzes", "id")
         });
     }
 }

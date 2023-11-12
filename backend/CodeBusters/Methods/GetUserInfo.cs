@@ -15,7 +15,7 @@ public static partial class Methods
     public static async Task GetUserInfoAsync(HttpListenerRequest request, HttpListenerResponse response)
     {
         var token = request.Headers["authToken"]!;
-        var userId = JwtHelper.ValidateToken(token);
+        var userId = JwtHelper<User>.ValidateToken(token);
         var body = new Response();
 
         if (userId == Guid.Empty)
@@ -25,6 +25,7 @@ public static partial class Methods
             body.ErrorInfo.Add("invalid token");
             await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
             response.OutputStream.Close();
+            return;
         }
 
         var db = new DbContext();

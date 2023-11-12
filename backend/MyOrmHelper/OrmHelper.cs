@@ -1,7 +1,10 @@
 ﻿using System.Collections;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 using Npgsql;
 
@@ -28,6 +31,17 @@ public class OrmHelper<T>
 
     public async Task<int> CreateTable(string name, params Column[] columns)
     {
+        var checkCommand = _connection.CreateCommand();
+        var checkCommandText = $"select table_name from information_schema.tables where table_name='{name}'";
+        checkCommand.CommandText = checkCommandText;
+        await using var reader = await checkCommand.ExecuteReaderAsync();
+
+        if (reader.HasRows) return 0;
+        
+        await reader.CloseAsync();
+        await _connection.CloseAsync();
+        await _connection.OpenAsync();
+        
         if (!columns.Any(x => x.PrimaryKey))
             throw new MissingPrimaryKeyException("table must contain primary key");
         if (columns.Count(x => x.PrimaryKey) > 1)
@@ -43,8 +57,8 @@ public class OrmHelper<T>
                 .Where(x => x.ForeignKey)
                 .Select(x => $", foreign key ({x.Name}) references public.{x.ReferencesTable}({x.ReferencesColumn})")) 
             : null;
-        var commandText = $"create table if not exists {name}({querySet}{constraints})";
-        
+        var commandText = $"create table {name}({querySet}{constraints})";
+
         var command = _connection.CreateCommand();
         command.CommandText = commandText;
         return await command.ExecuteNonQueryAsync();
@@ -71,47 +85,58 @@ public class OrmHelper<T>
         props.ToList().ForEach(p =>
         {
             var columnName = ConvertCase(p.Name);
-            var value = reader[columnName];
-                
-            if (value != DBNull.Value)
+            
+            try
             {
-                p.SetValue(instance, value);
+                var value = reader[columnName];
+
+                if (value != DBNull.Value)
+                {
+                    p.SetValue(instance, value);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
             }
         });
 
         return instance;
     }
     
-    //TODO
-    public async Task<int> InsertAsync(T entity)
+    public async Task<int> InsertAsync(T entity, string? tableName = null)
     {
         if (!CheckConnection()) return -1;
-        
-        var values = new List<object>();
-        var insert = $"insert into {_tableName}({string.Join(",", _properties.Where(p => {
-            var res = GetMyValue(p, entity);
-            if (res is null) return false;
-            values.Add(res);
-            return true;
-        }).Select(t => ConvertCase(t.Name)))})";
-        var commandText = $"{insert} values('{string.Join("','", values)}')";
+        tableName ??= _tableName;
+        var columns = new List<string>();
+        var checkCommand = _connection.CreateCommand();
+        var checkCommandText = $"select column_name from information_schema.columns where " +
+                               $"table_schema='public' and " +
+                               $"table_name='{tableName}'";
+        checkCommand.CommandText = checkCommandText;
+        await using var reader = await checkCommand.ExecuteReaderAsync();
 
-        var command = _connection.CreateCommand();
-        command.CommandText = commandText;
-        return await command.ExecuteNonQueryAsync();
-    }
-    
-    public async Task<int> InsertDeepAsync(T entity)
-    {
-        if (!CheckConnection()) return -1;
+        if (!reader.HasRows) return 0;
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader[0].ToString());
+        }
+        
+        await _connection.CloseAsync();
+        await _connection.OpenAsync();
         
         var values = new List<object>();
-        var insert = $"insert into {_tableName}({string.Join(",", _properties.Where(p => {
-            var res = GetMyValue(p, entity);
-            if (res is null) return false;
-            values.Add(res);
-            return true;
-        }).Select(t => ConvertCase(t.Name)))})";
+        var insert = $"insert into {tableName}(" +
+                     $"{string.Join(",", _properties
+                         .Where(p =>
+                         {
+                             if (!columns.Contains(ConvertCase(p.Name))) return false;
+                             var res = GetMyValue(p, entity);
+                             if (res is null) return false;
+                             values.Add(res);
+                             return true; 
+                         })
+                         .Select(t => ConvertCase(t.Name)))})";
         var commandText = $"{insert} values('{string.Join("','", values)}')";
 
         var command = _connection.CreateCommand();
@@ -143,6 +168,54 @@ public class OrmHelper<T>
         command.CommandText = commandText;
         return command.ExecuteNonQuery();
     }
+    
+    public List<T> LeftJoin<T, U>(
+        Expression<Func<T, U, bool>> joinCondition,
+        Expression<Func<T, U, dynamic>> resultSelector)
+    {
+        var leftTableName = typeof(T).Name;
+        var rightTableName = typeof(U).Name;
+
+        var joinTable = _connection.CreateCommand();
+        joinTable.CommandText = $"SELECT * FROM {leftTableName} LEFT JOIN {rightTableName} ON {ParseJoinCondition(joinCondition)}";
+        NpgsqlDataReader reader = joinTable.ExecuteReader();
+
+        var results = new List<T>();
+
+        while (reader.Read())
+        {
+            var leftObject = Activator.CreateInstance<T>();
+            var rightObject = Activator.CreateInstance<U>();
+
+            foreach (var property in leftObject.GetType().GetProperties())
+            {
+                property.SetValue(leftObject, reader[property.Name]);
+            }
+
+            foreach (var property in rightObject.GetType().GetProperties())
+            {
+                property.SetValue(rightObject, reader[property.Name]);
+            }
+
+            // Можно использовать resultSelector для проецирования результата
+            dynamic dynamicResultSelector = resultSelector.Compile();
+            dynamic result = dynamicResultSelector(leftObject, rightObject);
+
+            results.Add(result);
+        }
+
+        reader.Close();
+        return results;
+    }
+
+    private string ParseJoinCondition<T, U>(Expression<Func<T, U, bool>> joinCondition)
+    {
+        var body = (BinaryExpression)joinCondition.Body;
+        var left = (MemberExpression)body.Left;
+        var right = (MemberExpression)body.Right;
+
+        return $"{typeof(T).Name}.{left.Member.Name} = {typeof(U).Name}.{right.Member.Name}";
+    }
 
     public bool Exists(T entity, params string[]? constraints)
     {
@@ -162,6 +235,9 @@ public class OrmHelper<T>
     private object? GetMyValue(PropertyInfo p, T entity)
     {
         if (p.GetValue(entity) is null) return null;
+        if (p.GetCustomAttribute<ColumnAttribute>() is not null && 
+            p.GetCustomAttribute<ColumnAttribute>().TypeName == "jsonb")
+            return JsonSerializer.Serialize(p.GetValue(entity));
         return p.PropertyType.IsArray ? $"{{{string.Join(",", (((Array)p.GetValue(entity)!)!).OfType<object>())}}}" 
             : p.GetValue(entity);
     }

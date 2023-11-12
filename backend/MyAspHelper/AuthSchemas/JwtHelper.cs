@@ -2,14 +2,13 @@
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Nodes;
-using CodeBusters.Models;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CodeBusters.Utils;
 
-public static class JwtHelper
+public static class JwtHelper<T> where T: IAuthorizable
 {
-    public static string GenerateToken(User user)
+    public static string GenerateToken(T instanse)
     {
         using var jsonReader = new StreamReader("../../../appsettings.json");
         var jwtSecret = JsonNode.Parse(jsonReader.ReadToEnd())!["JwtSecret"]?.GetValue<string>();
@@ -21,7 +20,7 @@ public static class JwtHelper
         var key = Encoding.ASCII.GetBytes(jwtSecret);
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(new[] { new Claim("id", user.Id.ToString()) }),
+            Subject = new ClaimsIdentity(new[] { new Claim("id", instanse.Id.ToString()) }),
             Expires = DateTime.UtcNow.AddDays(1),
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
         };
