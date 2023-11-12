@@ -13,8 +13,9 @@ public static partial class Methods
     [Route("/register")]
     public static async Task RegisterAsync(HttpListenerRequest request, HttpListenerResponse response)
     {
+        var cancellationToken = new CancellationToken();
         using var sr = new StreamReader(request.InputStream);
-        var userStr = await sr.ReadToEndAsync().ConfigureAwait(false);
+        var userStr = await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         var body = new Response();
         
         var user = JsonSerializer.Deserialize<User>(userStr, new JsonSerializerOptions
@@ -32,7 +33,7 @@ public static partial class Methods
                 body.ErrorInfo = validationResult.results.Select(er => er.ErrorMessage).ToList();
                 response.ContentType = "application/json";
                 response.StatusCode = 400;
-                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
                 response.OutputStream.Close();
                 return;
             }
@@ -41,24 +42,24 @@ public static partial class Methods
         
             var dbContext = new DbContext();
         
-            if (await dbContext.CheckUserExists(user))
+            if (await dbContext.CheckUserExists(user, cancellationToken))
             {
                 body.Success = false;
                 body.ErrorInfo.Add("user already exists");
                 response.ContentType = "application/json";
                 response.StatusCode = 400;
-                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
                 response.OutputStream.Close();
                 return;
             }
             user.Id = Guid.NewGuid();
-            await dbContext.AddNewUserAsync(user);
+            await dbContext.AddNewUserAsync(user, cancellationToken);
         
             body.Success = true;
             body.Text = "added user successfully";
             response.ContentType = "application/json; charset=utf-8";
             response.StatusCode = 200;
-            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
             response.OutputStream.Close();
         }
     }

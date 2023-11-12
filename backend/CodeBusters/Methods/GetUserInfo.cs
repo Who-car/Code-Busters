@@ -14,6 +14,7 @@ public static partial class Methods
     [Route("/getUserInfo")]
     public static async Task GetUserInfoAsync(HttpListenerRequest request, HttpListenerResponse response)
     {
+        var cancellationToken = new CancellationToken();
         var token = request.Headers["authToken"]!;
         var userId = JwtHelper<User>.ValidateToken(token);
         var body = new Response();
@@ -23,16 +24,16 @@ public static partial class Methods
             response.StatusCode = 403;
             body.Success = false;
             body.ErrorInfo.Add("invalid token");
-            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
             response.OutputStream.Close();
             return;
         }
 
         var db = new DbContext();
-        var user = await db.GetUserByIdAsync(userId);
+        var user = await db.GetUserByIdAsync(userId, cancellationToken);
 
         response.StatusCode = 200;
-        await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(user)));
+        await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(user)), cancellationToken);
         response.OutputStream.Close();
     }
 }

@@ -24,23 +24,15 @@ public class OrmHelper<T>
         _connection = connection;
     }
 
-    private bool CheckConnection()
-    {
-        return _connection?.State == ConnectionState.Open;
-    }
-
-    public async Task<int> CreateTable(string name, params Column[] columns)
+    public async Task<int> CreateTableAsync(string name, CancellationToken token, params Column[] columns)
     {
         var checkCommand = _connection.CreateCommand();
         var checkCommandText = $"select table_name from information_schema.tables where table_name='{name}'";
         checkCommand.CommandText = checkCommandText;
-        await using var reader = await checkCommand.ExecuteReaderAsync();
+        await using var reader = await checkCommand.ExecuteReaderAsync(token);
 
         if (reader.HasRows) return 0;
-        
-        await reader.CloseAsync();
-        await _connection.CloseAsync();
-        await _connection.OpenAsync();
+        await RestoreConnectionAsync(token);
         
         if (!columns.Any(x => x.PrimaryKey))
             throw new MissingPrimaryKeyException("table must contain primary key");
@@ -51,7 +43,8 @@ public class OrmHelper<T>
             .Any(y => string.IsNullOrEmpty(y.ReferencesTable) && string.IsNullOrEmpty(y.ReferencesColumn)))
             throw new NullReferenceException("foreign key references no existing table");
 
-        var querySet = string.Join(", ", columns.Select(x => $"{x.Name} {x.SqlType}{(x.PrimaryKey ? " primary key" : "" )}"));
+        var querySet = string.Join(", ", 
+            columns.Select(x => $"{x.Name} {x.SqlType}{(x.PrimaryKey ? " primary key" : "" )}"));
         var constraints = columns.Any(x => x.ForeignKey) 
             ? string.Join(' ', columns
                 .Where(x => x.ForeignKey)
@@ -61,76 +54,91 @@ public class OrmHelper<T>
 
         var command = _connection.CreateCommand();
         command.CommandText = commandText;
-        return await command.ExecuteNonQueryAsync();
+        return await command.ExecuteNonQueryAsync(token);
     }
     
-    public async Task<TReturn> SearchWithParamsAsync<TReturn>(string columnName, object value) where TReturn: new()
+    public async Task<bool> ExistsAsync(T entity, CancellationToken token, string? tableName = null)
     {
-        if (!CheckConnection()) throw new ChannelClosedException();
+        if (!CheckConnection()) return false;
+        tableName ??= _tableName;
         
-        var querySet = _properties
-            .Where(p => ConvertCase(p.Name) == columnName)
-            .Select(p => $"{ConvertCase(p.Name)} = '{value}'");
-        var commandText = $"select * from {_tableName} where {string.Join(" and ", querySet)}";
+        var querySet = 
+            _properties
+                .Select(p => 
+                    $"{ConvertCase(p.Name)} = '{GetMyValue(p, entity)}'");
+        var commandText = $"select * from {tableName} where {string.Join(" and ", querySet)}";
 
         var command = _connection.CreateCommand();
         command.CommandText = commandText;
-        await using var reader = await command.ExecuteReaderAsync();
+        await using var reader = await command.ExecuteReaderAsync(token);
 
-        if (!reader.HasRows || !await reader.ReadAsync()) throw new KeyNotFoundException();
+        return reader.HasRows;
+    }
+    
+    public async Task<TReturn> FindAsync<TReturn>(IEnumerable<(string column, object value)> parameters, CancellationToken token, string? tableName = null) 
+        where TReturn: new()
+    {
+        if (!CheckConnection()) throw new ChannelClosedException();
+        tableName ??= _tableName;
+
+        var querySet = 
+            parameters
+                .Select(pair => $"{pair.column}='{pair.value}'")
+                .ToString();
+        var commandText = $"select * from {tableName} where {string.Join(" and ", querySet)}";
+
+        var command = _connection.CreateCommand();
+        command.CommandText = commandText;
+        await using var reader = await command.ExecuteReaderAsync(token);
+
+        if (!reader.HasRows || !await reader.ReadAsync(token)) 
+            throw new KeyNotFoundException($"No {typeof(TReturn).Name} ({querySet}) found");
         
         var instance = new TReturn();
-        var props = typeof(TReturn).GetProperties();
-
-        props.ToList().ForEach(p =>
-        {
-            var columnName = ConvertCase(p.Name);
-            
-            try
+        typeof(TReturn)
+            .GetProperties()
+            .ToList()
+            .ForEach(p =>
             {
-                var value = reader[columnName];
-
-                if (value != DBNull.Value)
+                var columnName = ConvertCase(p.Name);
+                
+                try
                 {
-                    p.SetValue(instance, value);
+                    p.SetValue(instance, reader[columnName]);
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-        });
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+            });
 
         return instance;
     }
     
-    public async Task<int> InsertAsync(T entity, string? tableName = null)
+    public async Task<int> InsertAsync(T entity, CancellationToken token, string? tableName = null)
     {
         if (!CheckConnection()) return -1;
         tableName ??= _tableName;
+        
         var columns = new List<string>();
         var checkCommand = _connection.CreateCommand();
         var checkCommandText = $"select column_name from information_schema.columns where " +
                                $"table_schema='public' and " +
                                $"table_name='{tableName}'";
         checkCommand.CommandText = checkCommandText;
-        await using var reader = await checkCommand.ExecuteReaderAsync();
+        await using var reader = await checkCommand.ExecuteReaderAsync(token);
 
         if (!reader.HasRows) return 0;
-        while (await reader.ReadAsync())
-        {
-            columns.Add(reader[0].ToString());
-        }
-        
-        await _connection.CloseAsync();
-        await _connection.OpenAsync();
-        
+        while (await reader.ReadAsync(token))
+            columns.Add(reader[0].ToString()!);
+
+        await RestoreConnectionAsync(token);
         var values = new List<object>();
         var insert = $"insert into {tableName}(" +
                      $"{string.Join(",", _properties
+                         .Where(p => columns.Contains(ConvertCase(p.Name)))
                          .Where(p =>
                          {
-                             if (!columns.Contains(ConvertCase(p.Name))) return false;
                              var res = GetMyValue(p, entity);
                              if (res is null) return false;
                              values.Add(res);
@@ -141,7 +149,7 @@ public class OrmHelper<T>
 
         var command = _connection.CreateCommand();
         command.CommandText = commandText;
-        return await command.ExecuteNonQueryAsync();
+        return await command.ExecuteNonQueryAsync(token);
     }
 
     public int Update(T entity, string keyName, object keyValue)
@@ -169,37 +177,30 @@ public class OrmHelper<T>
         return command.ExecuteNonQuery();
     }
     
-    public List<T> LeftJoin<T, U>(
-        Expression<Func<T, U, bool>> joinCondition,
-        Expression<Func<T, U, dynamic>> resultSelector)
+    public List<TLeft> LeftJoin<TLeft, TRight>(Expression<Func<TLeft, TRight, bool>> joinCondition, Expression<Func<TLeft, TRight, dynamic>> resultSelector)
     {
-        var leftTableName = typeof(T).Name;
-        var rightTableName = typeof(U).Name;
+        var leftTableName = $"{typeof(TLeft).Name.ToLower()}s";
+        var rightTableName = $"{typeof(TRight).Name.ToLower()}s";
 
         var joinTable = _connection.CreateCommand();
-        joinTable.CommandText = $"SELECT * FROM {leftTableName} LEFT JOIN {rightTableName} ON {ParseJoinCondition(joinCondition)}";
-        NpgsqlDataReader reader = joinTable.ExecuteReader();
+        joinTable.CommandText = $"select * from {leftTableName} left join {rightTableName} on {ParseJoinCondition(joinCondition)}";
+        var reader = joinTable.ExecuteReader();
 
-        var results = new List<T>();
+        var results = new List<TLeft>();
 
         while (reader.Read())
         {
-            var leftObject = Activator.CreateInstance<T>();
-            var rightObject = Activator.CreateInstance<U>();
+            var leftObject = Activator.CreateInstance<TLeft>();
+            var rightObject = Activator.CreateInstance<TRight>();
 
-            foreach (var property in leftObject.GetType().GetProperties())
-            {
+            foreach (var property in leftObject!.GetType().GetProperties())
                 property.SetValue(leftObject, reader[property.Name]);
-            }
 
-            foreach (var property in rightObject.GetType().GetProperties())
-            {
+            foreach (var property in rightObject!.GetType().GetProperties())
                 property.SetValue(rightObject, reader[property.Name]);
-            }
-
-            // Можно использовать resultSelector для проецирования результата
-            dynamic dynamicResultSelector = resultSelector.Compile();
-            dynamic result = dynamicResultSelector(leftObject, rightObject);
+            
+            var dynamicResultSelector = resultSelector.Compile();
+            var result = dynamicResultSelector(leftObject, rightObject);
 
             results.Add(result);
         }
@@ -208,57 +209,49 @@ public class OrmHelper<T>
         return results;
     }
 
-    private string ParseJoinCondition<T, U>(Expression<Func<T, U, bool>> joinCondition)
+    private string ParseJoinCondition<TLeft, TRight>(Expression<Func<TLeft, TRight, bool>> joinCondition)
     {
         var body = (BinaryExpression)joinCondition.Body;
         var left = (MemberExpression)body.Left;
         var right = (MemberExpression)body.Right;
 
-        return $"{typeof(T).Name}.{left.Member.Name} = {typeof(U).Name}.{right.Member.Name}";
-    }
-
-    public bool Exists(T entity, params string[]? constraints)
-    {
-        if (!CheckConnection()) return false;
-        
-        var querySet = constraints is null ? _properties.Select(p => $"{ConvertCase(p.Name)} = '{GetMyValue(p, entity)}'")
-                : _properties.Where(p => constraints.Contains(ConvertCase(p.Name))).Select(p => $"{ConvertCase(p.Name)} = '{GetMyValue(p, entity)}'");
-        var commandText = $"select * from {_tableName} where {string.Join(" and ", querySet)}";
-
-        var command = _connection.CreateCommand();
-        command.CommandText = commandText;
-        using var reader = command.ExecuteReader();
-
-        return reader.HasRows && reader.Read();
+        return $"{typeof(TLeft).Name}.{left.Member.Name} = {typeof(TRight).Name}.{right.Member.Name}";
     }
 
     private object? GetMyValue(PropertyInfo p, T entity)
     {
-        if (p.GetValue(entity) is null) return null;
-        if (p.GetCustomAttribute<ColumnAttribute>() is not null && 
-            p.GetCustomAttribute<ColumnAttribute>().TypeName == "jsonb")
-            return JsonSerializer.Serialize(p.GetValue(entity));
-        return p.PropertyType.IsArray ? $"{{{string.Join(",", (((Array)p.GetValue(entity)!)!).OfType<object>())}}}" 
-            : p.GetValue(entity);
+        var value = p.GetValue(entity);
+        var columnType = p.GetCustomAttribute<ColumnAttribute>();
+        
+        if (value is null) 
+            return null;
+        
+        if (columnType is not null && columnType.TypeName == "jsonb")
+            return JsonSerializer.Serialize(value);
+        
+        return p.PropertyType.IsArray 
+            ? $"{{{string.Join(",", ((Array)value).OfType<object>())}}}" 
+            : value;
     }
 
     private string ConvertCase(string input)
     {
-        var output = new StringBuilder();
+        return input
+            .Select(s => 
+                char.IsUpper(s) 
+                    ? $"_{char.ToLower(s)}" 
+                    : $"{s}")
+            .ToString()!;
+    }
     
-        for (int i = 0; i < input.Length; i++)
-        {
-            if (i > 0 && Char.IsUpper(input[i]))
-            {
-                output.Append('_');
-                output.Append(Char.ToLower(input[i]));
-            }
-            else
-            {
-                output.Append(Char.ToLower(input[i]));
-            }
-        }
-    
-        return output.ToString();
+    private bool CheckConnection()
+    {
+        return _connection.State == ConnectionState.Open;
+    }
+
+    private async Task RestoreConnectionAsync(CancellationToken token)
+    {
+        await _connection.CloseAsync();
+        await _connection.OpenAsync(token);
     }
 }

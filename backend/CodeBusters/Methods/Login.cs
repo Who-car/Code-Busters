@@ -13,8 +13,9 @@ public static partial class Methods
     [Route("/login")]
     public static async Task LoginAsync(HttpListenerRequest request, HttpListenerResponse response)
     {
+        var cancellationToken = new CancellationToken();
         using var sr = new StreamReader(request.InputStream);
-        var loginStr = await sr.ReadToEndAsync().ConfigureAwait(false);
+        var loginStr = await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         
         var body = new Response();
         
@@ -29,7 +30,7 @@ public static partial class Methods
             var user = new User();
             try
             {
-                user = await dbContext.GetUserByEmailAsync(login.Email);
+                user = await dbContext.GetUserByEmailAsync(login.Email, cancellationToken);
             }
             catch (KeyNotFoundException e)
             {
@@ -38,7 +39,7 @@ public static partial class Methods
                 body.ErrorInfo.Add($"Additional info: {e.Message}");
                 response.ContentType = "application/json";
                 response.StatusCode = 404;
-                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
                 response.OutputStream.Close();
                 return;
             }
@@ -49,7 +50,7 @@ public static partial class Methods
                 body.ErrorInfo.Add("Passwords don't match");
                 response.ContentType = "application/json";
                 response.StatusCode = 400;
-                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
                 response.OutputStream.Close();
                 return;
             }
@@ -60,7 +61,7 @@ public static partial class Methods
             body.Token = token;
             response.ContentType = "application/json";
             response.StatusCode = 200;
-            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
             response.OutputStream.Close();
         }
     }

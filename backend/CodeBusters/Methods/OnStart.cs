@@ -11,7 +11,7 @@ public static partial class Methods
     {
         var db = new DbContext();
 
-        await db.CreateTableAsync<User>(tableName: "users", new[]
+        await db.CreateTableAsync<User>(tableName: "users", new CancellationToken(), new[]
         {
             new Column("id", typeof(Guid), true),
             new Column("name", typeof(string)),
@@ -19,7 +19,7 @@ public static partial class Methods
             new Column("password", typeof(string))
         });
 
-        await db.CreateTableAsync<Quiz>(tableName: "quizzes", new[]
+        await db.CreateTableAsync<Quiz>(tableName: "quizzes", new CancellationToken(), new[]
         {
             new Column("id", typeof(Guid), true),
             new Column("topic", typeof(string)),
@@ -49,7 +49,7 @@ public static partial class Methods
         //     new Column("quiz id", typeof(Guid), "quizzes", "id")
         // });
 
-        await db.CreateTableAsync<Comment>(tableName: "comments", new[]
+        await db.CreateTableAsync<Comment>(tableName: "comments", new CancellationToken(), new[]
         {
             new Column("id", typeof(Guid), true),
             new Column("text", typeof(string)),

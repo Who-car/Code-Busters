@@ -14,6 +14,7 @@ public static partial class Methods
     [Route("/addQuiz")]
     public static async Task AddQuizAsync(HttpListenerRequest request, HttpListenerResponse response)
     {
+        var cancellationToken = new CancellationToken();
         var token = request.Headers["authToken"]!;
         var userId = JwtHelper<User>.ValidateToken(token);
         var body = new Response();
@@ -23,13 +24,13 @@ public static partial class Methods
             response.StatusCode = 403;
             body.Success = false;
             body.ErrorInfo.Add("invalid token");
-            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
             response.OutputStream.Close();
             return;
         }
         
         using var sr = new StreamReader(request.InputStream);
-        var quizStr = await sr.ReadToEndAsync().ConfigureAwait(false);
+        var quizStr = await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         
         var quiz = JsonSerializer.Deserialize<Quiz>(quizStr, new JsonSerializerOptions
         {
@@ -46,7 +47,7 @@ public static partial class Methods
                 body.ErrorInfo = validationResult.results.Select(er => er.ErrorMessage).ToList();
                 response.ContentType = "application/json";
                 response.StatusCode = 400;
-                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+                await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
                 response.OutputStream.Close();
                 return;
             }
@@ -55,13 +56,13 @@ public static partial class Methods
             
             quiz.Id = Guid.NewGuid();
             quiz.AuthorId = userId;
-            await dbContext.AddNewQuizAsync(quiz);
+            await dbContext.AddNewQuizAsync(quiz, cancellationToken);
         
             body.Success = true;
             body.Text = "added quiz successfully";
             response.ContentType = "application/json; charset=utf-8";
             response.StatusCode = 200;
-            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)));
+            await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body)), cancellationToken);
             response.OutputStream.Close();
         }
     }
