@@ -6,25 +6,25 @@ public class AppBuilder
 
     public AppBuilder WithAuthorization()
     {
-        _app.Container.Register<IMiddleware, AuthMiddleware>();
+        _app.IocContainer.Register<IMiddleware, AuthMiddleware>();
         return this;
     }
 
     public AppBuilder WithApiCheck()
     {
-        _app.Container.Register<IMiddleware, ApiCheckMiddleware>();
+        _app.IocContainer.Register<IMiddleware, ApiCheckMiddleware>();
         return this;
     }
 
     public AppBuilder WithAttributeRoutes()
     {
-        _app.Container.Register<IMiddleware, AttributeMapMiddleware>();
+        _app.IocContainer.Register<IMiddleware, AttributeMapMiddleware>();
         return this;
     }
 
     public AppBuilder WithCorsPolicy()
     {
-        _app.Container.Register<IMiddleware, CorsConfigMiddleware>();
+        _app.IocContainer.Register<IMiddleware, CorsConfigMiddleware>();
         return this;
     }
     

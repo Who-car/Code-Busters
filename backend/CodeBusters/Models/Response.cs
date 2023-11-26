@@ -6,4 +6,5 @@ public class Response
     public List<string?> ErrorInfo { get; set; } = new();
     public string? Token { get; set; }
     public string? Text { get; set; }
+    public object? Body { get; set; }
 }

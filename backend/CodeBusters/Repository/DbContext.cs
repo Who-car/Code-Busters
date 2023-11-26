@@ -48,22 +48,53 @@ public class DbContext
         return user;
     }
     
-    public async Task<ReturnUser> GetUserByIdAsync(Guid id, CancellationToken token)
+    public async Task<UserDto> GetUserByIdAsync(Guid id, CancellationToken token)
     {
         await _connection.OpenAsync(token);
         var orm = new OrmHelper<User>(_connection);
-        var user = await orm.FindAsync<ReturnUser>(new List<(string column, object value)> {("id", id)}, token);
+        var user = await orm.FindAsync<UserDto>(new List<(string column, object value)> {("id", id)}, token);
         await _connection.CloseAsync();
 
         return user;
     }
+    //TODO: Реализовать
+    
+    // public async Task<QuizDto> GetQuizzesAsync(int count, CancellationToken token)
+    // {
+    //     await _connection.OpenAsync(token);
+    //     var orm = new OrmHelper<QuizDto>(_connection);
+    //     var quizzes = await orm.SelectAsync<QuizDto>(count, token);
+    //     await _connection.CloseAsync();
+    //
+    //     return quizzes;
+    // }
+    
+    // public async Task<QuizDto> GetQuizAsync(Guid id, CancellationToken token)
+    // {
+    //     await _connection.OpenAsync(token);
+    //     var orm = new OrmHelper<QuizDto>(_connection);
+    //     var quizzes = await orm.SelectAsync<QuizDto>(count, token);
+    //     await _connection.CloseAsync();
+    //
+    //     return quizzes;
+    // }
 
     public async Task<bool> CheckUserExists(User user, CancellationToken token)
     {
         await _connection.OpenAsync(token);
         var orm = new OrmHelper<User>(_connection);
-        var result = await orm.ExistsAsync(user, token);
-        await _connection.CloseAsync();
-        return result;
+        try
+        {
+            await orm.FindAsync<User>(new List<(string column, object value)> { ("email", user.Email) }, token);
+            return true;
+        }
+        catch (KeyNotFoundException e)
+        {
+            return false;
+        }
+        finally
+        {
+            await _connection.CloseAsync();
+        }
     }
 }

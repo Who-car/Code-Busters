@@ -57,35 +57,15 @@ public class OrmHelper<T>
         return await command.ExecuteNonQueryAsync(token);
     }
     
-    public async Task<bool> ExistsAsync(T entity, CancellationToken token, string? tableName = null)
-    {
-        if (!CheckConnection()) return false;
-        tableName ??= _tableName;
-        
-        var querySet = 
-            _properties
-                .Select(p => 
-                    $"{ConvertCase(p.Name)} = '{GetMyValue(p, entity)}'");
-        var commandText = $"select * from {tableName} where {string.Join(" and ", querySet)}";
-
-        var command = _connection.CreateCommand();
-        command.CommandText = commandText;
-        await using var reader = await command.ExecuteReaderAsync(token);
-
-        return reader.HasRows;
-    }
-    
     public async Task<TReturn> FindAsync<TReturn>(IEnumerable<(string column, object value)> parameters, CancellationToken token, string? tableName = null) 
         where TReturn: new()
     {
         if (!CheckConnection()) throw new ChannelClosedException();
         tableName ??= _tableName;
-
-        var querySet = 
-            parameters
-                .Select(pair => $"{pair.column}='{pair.value}'")
-                .ToString();
-        var commandText = $"select * from {tableName} where {string.Join(" and ", querySet)}";
+        
+        var querySet = string.Join(" and ", parameters
+            .Select(pair => $"{pair.column}='{pair.value}'"));
+        var commandText = $"select * from {tableName} where {querySet}";
 
         var command = _connection.CreateCommand();
         command.CommandText = commandText;
@@ -134,6 +114,7 @@ public class OrmHelper<T>
 
         await RestoreConnectionAsync(token);
         var values = new List<object>();
+        var test = string.Join(", ", _properties.Select(p => ConvertCase(p.Name)));
         var insert = $"insert into {tableName}(" +
                      $"{string.Join(",", _properties
                          .Where(p => columns.Contains(ConvertCase(p.Name)))
@@ -236,12 +217,14 @@ public class OrmHelper<T>
 
     private string ConvertCase(string input)
     {
-        return input
-            .Select(s => 
+        return string.Join(
+            "", 
+            input.Select(s => 
                 char.IsUpper(s) 
-                    ? $"_{char.ToLower(s)}" 
-                    : $"{s}")
-            .ToString()!;
+                    ? input.IndexOf(s) == 0 
+                        ? $"{char.ToLower(s)}" 
+                        : $"_{char.ToLower(s)}" 
+                    : $"{s}"));
     }
     
     private bool CheckConnection()

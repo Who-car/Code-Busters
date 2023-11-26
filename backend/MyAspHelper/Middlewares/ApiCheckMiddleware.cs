@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Text;
 
 namespace MyAspHelper;
 
@@ -11,6 +12,7 @@ public class ApiCheckMiddleware : IMiddleware
         if (request.Url == null || !request.Url.LocalPath.StartsWith("/api"))
         {
             response.StatusCode = 404;
+            await response.OutputStream.WriteAsync("No corresponding method found"u8.ToArray());
             response.OutputStream.Close();
             return;
         }

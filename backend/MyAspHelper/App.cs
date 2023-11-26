@@ -9,7 +9,7 @@ public class App
 {
     private readonly MiddlewareChain _chain = new();
     private readonly HttpListener _listener = new(); 
-    public readonly Container Container = new();
+    public readonly IocContainer IocContainer = new();
 
     private async Task HandleIncomingRequests()
     { 
@@ -40,7 +40,7 @@ public class App
     {
         var url = GetUrl();
         
-        _chain.ResolveContainer(Container);
+        _chain.ResolveContainer(IocContainer);
         _listener.Prefixes.Add(url);
         _listener.Start();
         Console.WriteLine($"Server started\nListening on {url}...");

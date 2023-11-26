@@ -3,6 +3,8 @@ using CodeBusters.Models;
 using MyAspHelper;
 using MyOrmHelper;
 
+//TODO: Расставить комментарии адекватные
+
 var builder = new AppBuilder();
 var app = builder
     .WithCorsPolicy()

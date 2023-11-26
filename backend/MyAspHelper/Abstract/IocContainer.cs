@@ -1,6 +1,6 @@
 ﻿namespace MyAspHelper;
 
-public class Container
+public class IocContainer
 {
     private readonly Dictionary<Type, List<Type>> RegisteredObjects = new();
     
