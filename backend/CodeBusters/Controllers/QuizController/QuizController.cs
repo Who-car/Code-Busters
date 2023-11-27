@@ -31,9 +31,9 @@ public class QuizController : Controller
         if (quiz is null)
             return await BadRequest("All fields must be filled");
         
-        var validationResult = CustomValidator.Validate(quiz);
-        if (validationResult is { isSuccess: false })
-            return await BadRequest(string.Join(';', validationResult.results.Select(er => er.ErrorMessage)));
+        var validationResult = QuizValidator.TryValidate(quiz);
+        if (!validationResult.IsValid)
+            return await BadRequest(string.Join(';', validationResult.Errors.Select(er => er.ErrorMessage)));
             
         var dbContext = new DbContext();
         quiz.Id = Guid.NewGuid();
@@ -48,8 +48,7 @@ public class QuizController : Controller
     {
         var cancellationToken = new CancellationToken();
         var db = new DbContext();
-        // var quizzes = await db.GetQuizzesAsync(count, cancellationToken);
-        var quizzes = new List<Quiz>();
+        var quizzes = await db.GetQuizzesAsync(count, cancellationToken);
         return await Ok(JsonSerializer.Serialize(quizzes));
     }
 
@@ -59,8 +58,7 @@ public class QuizController : Controller
         var cancellationToken = new CancellationToken();
         
         var db = new DbContext();
-        // var quiz = await db.GetQuizAsync(id, cancellationToken);
-        var quiz = new Quiz();
+        var quiz = await db.GetQuizAsync(id, cancellationToken);
         return await Ok(JsonSerializer.Serialize(quiz));
     }
 
@@ -69,8 +67,7 @@ public class QuizController : Controller
     {
         var cancellationToken = new CancellationToken();
         var db = new DbContext();
-        // var comments = await db.GetCommentsAsync(id, cancellationToken);
-        var comments = new List<Comment>();
+        var comments = await db.GetCommentsAsync(id, cancellationToken);
         return await Ok(JsonSerializer.Serialize(comments));
     }
     
@@ -99,7 +96,7 @@ public class QuizController : Controller
         comment.Id = Guid.NewGuid();
         comment.AuthorId = userId;
         comment.QuizId = id;
-        // await dbContext.AddNewCommentAsync(comment, cancellationToken);
+        await dbContext.AddCommentAsync(comment, cancellationToken);
 
         return await Ok();
     }

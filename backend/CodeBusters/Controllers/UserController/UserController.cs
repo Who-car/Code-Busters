@@ -25,9 +25,9 @@ public class UserController : Controller
         if (user is null)
             return await BadRequest("All fields must be filled");
         
-        var validationResult = CustomValidator.Validate(user);
-        if (validationResult is { isSuccess: false })
-            return await BadRequest(string.Join(';', validationResult.results.Select(er => er.ErrorMessage)));
+        var validationResult = UserValidator.TryValidate(user);
+        if (!validationResult.IsValid)
+            return await BadRequest(string.Join(';', validationResult.Errors.Select(er => er.ErrorMessage)));
             
         user.Password = Hasher.Hash(user.Password);
         var dbContext = new DbContext();

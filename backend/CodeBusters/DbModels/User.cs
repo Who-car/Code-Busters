@@ -2,7 +2,6 @@
 
 namespace CodeBusters.Models;
 
-[UserValidation]
 public class User : IAuthorizable
 {
     public Guid Id { get; set; }

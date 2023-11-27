@@ -56,6 +56,43 @@ public class OrmHelper<T>
         command.CommandText = commandText;
         return await command.ExecuteNonQueryAsync(token);
     }
+
+    public async Task<List<TReturn>> SelectAsync<TReturn>(string cursor, int? limit, CancellationToken token) 
+        where TReturn: new()
+    {
+        if (!CheckConnection()) 
+            throw new ChannelClosedException();
+        
+        var command = _connection.CreateCommand();
+        command.CommandText = limit is null
+            ? $"SELECT * FROM {_tableName}"
+            : $"SELECT * FROM {_tableName} WHERE id > '{cursor}' ORDER BY id LIMIT {limit}";
+    
+        var reader = command.ExecuteReader();
+        var items = new List<TReturn>();
+    
+        while (await reader.ReadAsync(token))
+        {
+            var item = new TReturn();
+        
+            for (var i = 0; i < reader.FieldCount; i++)
+            {
+                var fieldName = reader.GetName(i);
+                var property = _properties.FirstOrDefault(p => p.Name == fieldName);
+            
+                if (property != null)
+                {
+                    var value = reader.GetValue(i);
+                    property.SetValue(item, value);
+                }
+            }
+        
+            items.Add(item);
+        }
+    
+        await reader.CloseAsync();
+        return items;
+    }
     
     public async Task<TReturn> FindAsync<TReturn>(IEnumerable<(string column, object value)> parameters, CancellationToken token, string? tableName = null) 
         where TReturn: new()
@@ -114,7 +151,6 @@ public class OrmHelper<T>
 
         await RestoreConnectionAsync(token);
         var values = new List<object>();
-        var test = string.Join(", ", _properties.Select(p => ConvertCase(p.Name)));
         var insert = $"insert into {tableName}(" +
                      $"{string.Join(",", _properties
                          .Where(p => columns.Contains(ConvertCase(p.Name)))

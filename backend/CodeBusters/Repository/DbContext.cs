@@ -57,27 +57,44 @@ public class DbContext
 
         return user;
     }
-    //TODO: Реализовать
+    //TODO: где хранить курсор?
+    public async Task<List<Quiz>> GetQuizzesAsync(int count, CancellationToken token)
+    {
+        await _connection.OpenAsync(token);
+        var orm = new OrmHelper<Quiz>(_connection);
+        var quizzes = await orm.SelectAsync<Quiz>("", count, token);
+        await _connection.CloseAsync();
     
-    // public async Task<QuizDto> GetQuizzesAsync(int count, CancellationToken token)
-    // {
-    //     await _connection.OpenAsync(token);
-    //     var orm = new OrmHelper<QuizDto>(_connection);
-    //     var quizzes = await orm.SelectAsync<QuizDto>(count, token);
-    //     await _connection.CloseAsync();
-    //
-    //     return quizzes;
-    // }
+        return quizzes;
+    }
     
-    // public async Task<QuizDto> GetQuizAsync(Guid id, CancellationToken token)
-    // {
-    //     await _connection.OpenAsync(token);
-    //     var orm = new OrmHelper<QuizDto>(_connection);
-    //     var quizzes = await orm.SelectAsync<QuizDto>(count, token);
-    //     await _connection.CloseAsync();
-    //
-    //     return quizzes;
-    // }
+    public async Task<Quiz> GetQuizAsync(Guid id, CancellationToken token)
+    {
+        await _connection.OpenAsync(token);
+        var orm = new OrmHelper<Quiz>(_connection);
+        var quiz = await orm.FindAsync<Quiz>(new List<(string column, object value)> {("id", id)}, token);
+        await _connection.CloseAsync();
+    
+        return quiz;
+    }
+    //TODO: где хранить курсор?
+    public async Task<List<Comment>> GetCommentsAsync(Guid id, CancellationToken token)
+    {
+        await _connection.OpenAsync(token);
+        var orm = new OrmHelper<Comment>(_connection);
+        var quizzes = await orm.SelectAsync<Comment>("", null, token);
+        await _connection.CloseAsync();
+    
+        return quizzes;
+    }
+    
+    public async Task AddCommentAsync(Comment comment, CancellationToken token)
+    {
+        await _connection.OpenAsync(token);
+        var orm = new OrmHelper<Comment>(_connection);
+        await orm.InsertAsync(comment, token);
+        await _connection.CloseAsync();
+    }
 
     public async Task<bool> CheckUserExists(User user, CancellationToken token)
     {
