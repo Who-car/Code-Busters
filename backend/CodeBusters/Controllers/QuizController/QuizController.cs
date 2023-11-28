@@ -13,7 +13,8 @@ namespace CodeBusters.Controllers.QuizController;
 
 public class QuizController : Controller
 {
-    private static readonly QuizContext _context = new QuizContext();
+    // TODO: контекст должен обновляться только при наличии флага
+    private readonly QuizContext _context = new QuizContext();
     
     [HttpPost]
     [Authorize]
@@ -21,33 +22,52 @@ public class QuizController : Controller
     public async Task<ActionResult> AddQuizAsync()
     {
         var cancellationToken = new CancellationToken();
-        var token = Request.Headers["authToken"]!;
-        var userId = JwtHelper<User>.ValidateToken(token);
+        var token = ContextResult.AuthToken;
+        var userId = JwtHelper<User>.ValidateToken(token!);
 
         if (userId == Guid.Empty)
-            return BadRequest("Invalid token");
+            return BadRequest("Invalid token",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"Token has expired. Please, log in to continue"}
+                });
         
-        using var sr = new StreamReader(Request.InputStream);
+        using var sr = new StreamReader(ContextResult.Request.InputStream);
         var quizStr = await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         var quiz = JsonSerializer.Deserialize<Quiz>(quizStr, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
-            
         });
 
         if (quiz is null)
-            return BadRequest("All fields must be filled");
+            return BadRequest("Quiz insert failed",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"All fields must be filled"}
+                });
         
         var validationResult = QuizValidator.TryValidate(quiz);
         if (!validationResult.IsValid)
-            return BadRequest(string.Join(';', validationResult.Errors.Select(er => er.ErrorMessage)));
+            return BadRequest("Quiz insert failed",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = validationResult.Errors.Select(er => er.ErrorMessage).ToList()
+                });
             
         var dbContext = new DbContext();
         quiz.Id = Guid.NewGuid();
         quiz.AuthorId = userId;
         await dbContext.AddNewQuizAsync(quiz, cancellationToken);
 
-        return Ok("Quiz added successfully");
+        return Ok(
+            "Quiz insert success",
+            new SuccessResponseDto()
+            {
+               Result = true
+            });
     }
     
     //TODO: Не должен возвращать список ответов-вопросов
@@ -60,7 +80,7 @@ public class QuizController : Controller
         var quizzes = await db.GetQuizzesAsync(_context.LastSentQuizId, count, cancellationToken);
         if (quizzes.Count > 0)
             _context.LastSentQuizId = quizzes.Last().Id;
-        return Ok(JsonSerializer.Serialize(quizzes));
+        return Ok("", quizzes);
     }
     
     [HttpGet]
@@ -71,7 +91,7 @@ public class QuizController : Controller
         
         var db = new DbContext();
         var quiz = await db.GetQuizAsync(id, cancellationToken);
-        return Ok(JsonSerializer.Serialize(quiz));
+        return Ok("", quiz);
     }
 
     [HttpGet]
@@ -81,7 +101,7 @@ public class QuizController : Controller
         var cancellationToken = new CancellationToken();
         var db = new DbContext();
         var comments = await db.GetCommentsAsync(id, cancellationToken);
-        return Ok(JsonSerializer.Serialize(comments));
+        return Ok("", comments);
     }
     
     [HttpPost]
@@ -90,13 +110,18 @@ public class QuizController : Controller
     public async Task<ActionResult> AddComment(Guid id)
     {
         var cancellationToken = new CancellationToken();
-        var token = Request.Headers["authToken"]!;
+        var token = ContextResult.AuthToken;
         var userId = JwtHelper<User>.ValidateToken(token);
 
         if (userId == Guid.Empty)
-            return BadRequest("Invalid token");
+            return BadRequest("Invalid token",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"Token has expired. Please, log in to continue"}
+                });
         
-        using var sr = new StreamReader(Request.InputStream);
+        using var sr = new StreamReader(ContextResult.Request.InputStream);
         var commentStr = await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         var comment = JsonSerializer.Deserialize<Comment>(commentStr, new JsonSerializerOptions
         {
@@ -105,7 +130,12 @@ public class QuizController : Controller
         });
 
         if (comment is null)
-            return BadRequest("Can't add empty comment");
+            return BadRequest("Invalid token",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"Can't add empty comment"}
+                });
         
         var dbContext = new DbContext();
         comment.Id = Guid.NewGuid();

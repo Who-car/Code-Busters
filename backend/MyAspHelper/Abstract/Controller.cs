@@ -1,18 +1,19 @@
 ﻿using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace MyAspHelper.Abstract;
 
 public class Controller
 {
-    public HttpListenerRequest Request { get; set; }
-    public HttpListenerResponse Response { get; set; }
+    public HttpContextResult ContextResult { get; set; }
 
-    protected ActionResult Ok(string? text = null)
+    protected ActionResult Ok(string? text = null, object? data = null)
     {
         //TODO: Адекватно ли тут использовать Result?
         //Вызывающий и вызываемый метод - асинхронные, а этот - синхронный
-        return SendResponse(200, text).Result;
+        text ??= "";
+        return SendResponse(200, text, data).Result;
     }
     
     protected ActionResult Ok(byte[] data, string contentType)
@@ -20,41 +21,46 @@ public class Controller
         return SendResponse(200, contentType, data).Result;
     }
 
-    protected ActionResult BadRequest(string? text = null)
+    protected ActionResult BadRequest(string? text = null, object? data = null)
     {
-        return SendResponse(400, text).Result;
+        text ??= "";
+        return SendResponse(400, text, data).Result;
     }
     
-    protected ActionResult NotFound(string? text = null)
+    protected ActionResult NotFound(string? text = null, object? data = null)
     {
-        return SendResponse(404, text).Result;
+        text ??= "";
+        return SendResponse(404, text, data).Result;
     }
     
-    protected ActionResult Unauthorized(string? text = null)
+    protected ActionResult Unauthorized(string? text = null, object? data = null)
     {
-        return SendResponse(401, text).Result;
+        text ??= "";
+        return SendResponse(401, text, data).Result;
     }
     
-    protected ActionResult AccessDenied(string? text = null)
+    protected ActionResult AccessDenied(string? text = null, object? data = null)
     {
-        return SendResponse(403, text).Result;
+        text ??= "";
+        return SendResponse(403, text, data).Result;
     }
 
-    private async Task<ActionResult> SendResponse(int statusCode, string? text)
+    private async Task<ActionResult> SendResponse(int statusCode, string statusDescription, object? data)
     {
         // Из официальной документации Microsoft:
         // В инструкции finally блок выполняется, когда элемент управления покидает try блок.
         // Элемент управления может покинуть try блок в результате:
         //
         // нормальное выполнение,
-        // выполнение оператора перехода (т. е. return, break, continueили goto) или
+        // выполнение оператора перехода (т. е. return, break, continue или goto) или
         // распространение исключения из try блока.
         // https://learn.microsoft.com/ru-ru/dotnet/csharp/language-reference/statements/exception-handling-statements#the-try-finally-statement
         try
         {
-            Response.StatusCode = statusCode;
-            if (text is not null)
-                await Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(text));
+            ContextResult.Response.StatusCode = statusCode;
+            ContextResult.Response.StatusDescription = statusDescription;
+            if (data is not null)
+                await ContextResult.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(data, new JsonSerializerOptions {PropertyNamingPolicy = JsonNamingPolicy.CamelCase})));
             return new ActionResult(true);
         }
         catch (Exception e)
@@ -63,7 +69,7 @@ public class Controller
         }
         finally
         {
-            Response.OutputStream.Close();
+            ContextResult.Response.OutputStream.Close();
         }
     }
     
@@ -71,10 +77,10 @@ public class Controller
     {
         try
         {
-            Response.StatusCode = statusCode;
-            Response.ContentEncoding = Encoding.UTF8;
-            Response.ContentType = contentType;
-            await Response.OutputStream.WriteAsync(data);
+            ContextResult.Response.StatusCode = statusCode;
+            ContextResult.Response.ContentEncoding = Encoding.UTF8;
+            ContextResult.Response.ContentType = contentType;
+            await ContextResult.Response.OutputStream.WriteAsync(data);
             return new ActionResult(true);
         }
         catch (Exception e)
@@ -83,7 +89,7 @@ public class Controller
         }
         finally
         {
-            Response.OutputStream.Close();
+            ContextResult.Response.OutputStream.Close();
         }
     }
 }

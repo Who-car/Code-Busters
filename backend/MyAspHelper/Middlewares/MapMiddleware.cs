@@ -15,8 +15,11 @@ public class MapMiddleware : IMiddleware
         if (context.TargetMethod == null
             && context.Controller == null)
             await GetEndpoint(context);
-        
-        await Next.Handle(context);
+
+        if (context.TargetMethod is not null)
+            await Next.Handle(context);
+        else
+            await context.SendResponse(404, "No corresponding method found");
     }
     
     private async Task GetEndpoint(HttpContextResult context)
@@ -97,15 +100,11 @@ public class MapMiddleware : IMiddleware
         }
 
         if (targetMethod == null)
-        {
-            await context.SendResponse(404, "No corresponding method found");
             return;
-        }
         
         var controllerExpr = Expression.MemberInit(Expression.New(controller.Key));
         var targetController = Expression.Lambda<Func<Controller>>(controllerExpr).Compile()();
-        targetController.Request = context.Request;
-        targetController.Response = context.Response;
+        targetController.ContextResult = context;
         context.TargetMethod = targetMethod;
         context.Parameters = parameters.ToArray();
         context.Controller = targetController;

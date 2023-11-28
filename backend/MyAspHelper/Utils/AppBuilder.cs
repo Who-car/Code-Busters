@@ -41,8 +41,7 @@ public class AppBuilder
     
     public AppBuilder WithDbConfiguration<TRepository>(string? connectionString = null) where TRepository : IRepository
     {
-        connectionString ??= App.Settings["DbConnectionString"];
-        connectionString ??= "DefaultConnection";
+        connectionString ??= ConnectionString.Get(App.Settings["DatabaseConnectionString"]);
         TRepository.ConfigureDb(connectionString);
         return this;
     }

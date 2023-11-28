@@ -11,7 +11,7 @@ public class AuthMiddleware : IMiddleware
     // Из официальной документации Microsoft:
     // Модификатор required указывает, что поле или свойство, к которому они применены,
     // должны быть инициализированы инициализатором объекта. Любое выражение, которое
-    // инициализирует новый экземпляр типа , должно инициализировать все необходимые
+    // инициализирует новый экземпляр типа, должно инициализировать все необходимые
     // элементы. Модификатор required доступен начиная с C# 11. Модификатор required
     // позволяет разработчикам создавать типы, в которых свойства или поля должны быть
     // инициализированы должным образом, но при этом разрешать инициализацию с помощью
@@ -24,6 +24,7 @@ public class AuthMiddleware : IMiddleware
     //TODO: токен должен храниться в cookies
     public async Task Handle(HttpContextResult context)
     {
+        Console.WriteLine();
         if (context.TargetMethod!.GetCustomAttributes(typeof(AuthorizeAttribute), false).Length > 0)
         {
             if (context.AuthToken is null)

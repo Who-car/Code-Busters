@@ -18,6 +18,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         }
         catch (Exception e)
         {
+            Console.WriteLine(e);
             await context.SendResponse(500, $"Internal server error.\nAdditional info: {e.Message}");
         }
     }

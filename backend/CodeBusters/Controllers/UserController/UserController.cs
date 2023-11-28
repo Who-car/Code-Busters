@@ -16,9 +16,10 @@ public class UserController : Controller
     [Route("/api/User/register")]
     public async Task<ActionResult> RegisterAsync()
     {
+        // TODO: вынести логику десериализации?
         var cancellationToken = new CancellationToken();
         
-        using var sr = new StreamReader(Request.InputStream);
+        using var sr = new StreamReader(ContextResult.Request.InputStream);
         var userStr = await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         var user = JsonSerializer.Deserialize<User>(userStr, new JsonSerializerOptions
         {
@@ -26,21 +27,47 @@ public class UserController : Controller
         });
 
         if (user is null)
-            return BadRequest("All fields must be filled");
+            return BadRequest(
+                "Authorization failed", 
+                new ErrorResponseDto
+                {
+                    Result = false, 
+                    Errors = new List<string> { "All fields must be filled" }
+                });
         
         var validationResult = UserValidator.TryValidate(user);
         if (!validationResult.IsValid)
-            return BadRequest(string.Join(';', validationResult.Errors.Select(er => er.ErrorMessage)));
+            return BadRequest(
+                "Authorization failed", 
+                new ErrorResponseDto
+                {
+                    Result = false, 
+                    Errors = validationResult.Errors.Select(er => er.ErrorMessage).ToList()
+                });
             
         user.Password = Hasher.Hash(user.Password);
         var dbContext = new DbContext();
         if (await dbContext.CheckUserExists(user, cancellationToken))
-            return BadRequest("User already exists");
+            return BadRequest(
+                "Authorization failed", 
+                new ErrorResponseDto
+                {
+                    Result = false, 
+                    Errors = new List<string> { "User already exists" }
+                });
             
         user.Id = Guid.NewGuid();
         await dbContext.AddNewUserAsync(user, cancellationToken);
+        var token = JwtHelper<User>.GenerateToken(user);
 
-        return Ok("User added successfully");
+        return Ok(
+            "Successfully authorized", 
+            new SuccessResponseDto
+            {
+                Result = true, 
+                Token = token,
+                Id = user.Id
+            });
     }
     
     [HttpPost]
@@ -49,7 +76,7 @@ public class UserController : Controller
     {
         var cancellationToken = new CancellationToken();
         
-        using var sr = new StreamReader(Request.InputStream);
+        using var sr = new StreamReader(ContextResult.Request.InputStream);
         var loginStr = await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         var login = JsonSerializer.Deserialize<LoginDto>(loginStr, new JsonSerializerOptions
         {
@@ -57,24 +84,49 @@ public class UserController : Controller
         });
         
         if (login is null)
-            return BadRequest("Either login or password is empty");
+            return BadRequest(
+                "Authorization failed",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"Either login or password is empty"}
+                });
         
         var dbContext = new DbContext();
-        var user = new User();
+        User user;
         try
         {
             user = await dbContext.GetUserByEmailAsync(login.Email, cancellationToken);
         }
         catch (KeyNotFoundException e)
         {
-            return BadRequest($"No user with such email. Additional info: {e.Message}");
+            return BadRequest(
+                "Authorization failed",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {$"No user with such email. Additional info: {e.Message}"}
+                });
         }
         
-        if (!Hasher.Validate(user.Password, login.Password))
-            return BadRequest("Passwords don't match");
+        if (!Hasher.Validate(user.Password, login.Password)) 
+            return BadRequest(
+                "Authorization failed",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"Passwords don't match"}
+                });
 
         var token = JwtHelper<User>.GenerateToken(user);
-        return Ok(token);
+        return Ok(
+            "Successfully authorized", 
+            new SuccessResponseDto
+            {
+                Result = true, 
+                Token = token,
+                Id = user.Id
+            });
     }
     
     [HttpGet]
@@ -83,16 +135,34 @@ public class UserController : Controller
     public async Task<ActionResult> GetUserInfoAsync(Guid id)
     {
         var cancellationToken = new CancellationToken();
-        var token = Request.Headers["authToken"]!;
+        var token = ContextResult.AuthToken;
         var userId = JwtHelper<User>.ValidateToken(token);
 
         if (userId != id)
-            return AccessDenied("Invalid Token");
+            return AccessDenied(
+                "Invalid Token",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"Token has expired. Please, log in to continue"}
+                });
 
         var db = new DbContext();
-        var user = await db.GetUserByIdAsync(userId, cancellationToken);
-
-        return Ok(JsonSerializer.Serialize(user));
+        try
+        {
+            //TODO: бд должна выполнять left join user'а на его квизы
+            var user = await db.GetUserByIdAsync(userId, cancellationToken);
+            return Ok("", user);
+        }
+        catch (KeyNotFoundException e)
+        {
+            return NotFound("User not found",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"No user with such id"}
+                });
+        }
     }
     
     //TODO: починить путь (возможно относительно корневой папки системы?)
@@ -101,7 +171,7 @@ public class UserController : Controller
     [Route("api/User/{id:guid}/avatar/post")]
     public async Task<ActionResult> PostAvatar(Guid id)
     {
-        await using var body = Request.InputStream;
+        await using var body = ContextResult.Request.InputStream;
         var buffer = new byte[4096];
         var cancellationToken = new CancellationToken();
         using var ms = new MemoryStream();
@@ -116,7 +186,12 @@ public class UserController : Controller
         Directory.CreateDirectory("avatars");
         await File.WriteAllBytesAsync($"avatars/{id}.jpg", imageData, cancellationToken);
 
-        return Ok("avatar added");
+        return Ok(
+            "Avatar added",
+            new SuccessResponseDto()
+            {
+                Result = true
+            });
     }
 
     [HttpGet]
@@ -132,7 +207,12 @@ public class UserController : Controller
         }
         catch (FileNotFoundException e)
         {
-            return NotFound("User doesn't have avatar"); 
+            return NotFound("User not found",
+                new ErrorResponseDto()
+                {
+                    Result = false,
+                    Errors = new List<string>() {"User doesn't have an avatar"}
+                });
         }
 
         return Ok(image, "image/jpeg");

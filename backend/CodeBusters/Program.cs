@@ -4,6 +4,8 @@ using CodeBusters.Repository;
 using MyAspHelper.Middlewares;
 using MyAspHelper.Utils;
 
+// TODO: делать бенчмаркинг не в Programm)
+// TODO: Рефакторинг всего кода
 // var mw = new MapMiddleware();
 // Benchmark.TestTask(10000, () =>
 // {
@@ -12,8 +14,8 @@ using MyAspHelper.Utils;
 
 var builder = new AppBuilder();
 var app = builder
-    .WithRouteMapping()
     .WithCorsPolicy()
+    .WithRouteMapping()
     .WithHttpMethodCheck()
     .WithExceptionHandlers()
     .WithAuthorization()
