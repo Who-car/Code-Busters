@@ -60,7 +60,6 @@ public class UserController : Controller
             return BadRequest("Either login or password is empty");
         
         var dbContext = new DbContext();
-        //TODO: избавиться от выброса exception'a
         var user = new User();
         try
         {
@@ -138,4 +137,5 @@ public class UserController : Controller
 
         return Ok(image, "image/jpeg");
     }
+    //TODO: добавить друга, получать друзей
 }

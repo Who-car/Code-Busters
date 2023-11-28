@@ -41,7 +41,7 @@ public class App
         _listener.Prefixes.Add(url);
         _listener.Start();
         Console.WriteLine($"Server started\nListening on {url}...");
-
+        
         var listenTask = HandleIncomingRequests();
         listenTask.GetAwaiter().GetResult();
         

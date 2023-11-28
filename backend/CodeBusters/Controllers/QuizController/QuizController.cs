@@ -50,6 +50,7 @@ public class QuizController : Controller
         return Ok("Quiz added successfully");
     }
     
+    //TODO: Не должен возвращать список ответов-вопросов
     [HttpGet]
     [Route("/api/Quiz/get/{count:int}")]
     public async Task<ActionResult> GetAllQuizzes(int count)
@@ -114,4 +115,5 @@ public class QuizController : Controller
 
         return Ok();
     }
+    //TODO: хранить картинки квиза
 }
