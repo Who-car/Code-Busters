@@ -6,6 +6,7 @@ using CodeBusters.Utils;
 using MyAspHelper.Abstract;
 using MyAspHelper.Attributes;
 using MyAspHelper.Attributes.HttpMethods;
+using MyAspHelper.AuthSchemas;
 
 namespace CodeBusters.Controllers.UserController;
 
@@ -94,8 +95,7 @@ public class UserController : Controller
 
         return Ok(JsonSerializer.Serialize(user));
     }
-
-    //TODO: отлов возможных ошибок
+    
     //TODO: починить путь (возможно относительно корневой папки системы?)
     [HttpPost]
     [Authorize]

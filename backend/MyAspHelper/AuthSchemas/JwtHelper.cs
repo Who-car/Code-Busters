@@ -2,17 +2,16 @@
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Nodes;
+using CodeBusters.Utils;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CodeBusters.Utils;
+namespace MyAspHelper.AuthSchemas;
 
 public static class JwtHelper<T> where T: IAuthorizable
 {
-    public static string GenerateToken(T instanse)
+    public static string GenerateToken(T instance)
     {
-        //TODO: считывать данные из App.Settings
-        using var jsonReader = new StreamReader("../../../appsettings.json");
-        var jwtSecret = JsonNode.Parse(jsonReader.ReadToEnd())!["JwtSecret"]?.GetValue<string>();
+        var jwtSecret = App.Settings["JwtSecret"];
 
         if (jwtSecret is null)
             throw new NullReferenceException("JWT secret not set");
@@ -21,7 +20,7 @@ public static class JwtHelper<T> where T: IAuthorizable
         var key = Encoding.ASCII.GetBytes(jwtSecret);
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(new[] { new Claim("id", instanse.Id.ToString()) }),
+            Subject = new ClaimsIdentity(new[] { new Claim("id", instance.Id.ToString()) }),
             Expires = DateTime.UtcNow.AddDays(12),
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
         };
@@ -31,8 +30,7 @@ public static class JwtHelper<T> where T: IAuthorizable
     
     public static Guid ValidateToken(string token)
     {
-        using var jsonReader = new StreamReader("../../../appsettings.json");
-        var jwtSecret = JsonNode.Parse(jsonReader.ReadToEnd())!["JwtSecret"]?.GetValue<string>();
+        var jwtSecret = App.Settings["JwtSecret"];
         
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(jwtSecret!);

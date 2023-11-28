@@ -1,25 +1,18 @@
 ﻿using CodeBusters.Models;
+using MyAspHelper.Abstract;
 using MyOrmHelper;
 using Npgsql;
 
 namespace CodeBusters.Repository;
 
-public class DbContext
+public class DbContext : IRepository
 {
-    private const string ConnectionString = "Host=localhost;" +
-                                            "Port=5432;" +
-                                            "Username=postgres;" +
-                                            "Password=ab9q0rui;" +
-                                            "Database=CodeBusters;" +
-                                            "Include Error Detail = true;";
-    private readonly NpgsqlConnection _connection = new(ConnectionString);
-    private readonly NpgsqlDataSource _dataSource;
+    private static string _connectionString;
+    private readonly NpgsqlConnection _connection = new(_connectionString);
 
-    public DbContext()
+    public static void ConfigureDb(string connectionString)
     {
-        var builder = new NpgsqlDataSourceBuilder(ConnectionString);
-        builder.MapEnum<Difficulty>();
-        _dataSource = builder.Build();
+        _connectionString = connectionString;
     }
 
     public async Task CreateTableAsync<T>(string tableName, CancellationToken token, Column[] columns)

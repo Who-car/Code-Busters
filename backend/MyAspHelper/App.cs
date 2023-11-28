@@ -13,7 +13,7 @@ public class App
     private readonly MiddlewareChain _chain = new();
     private readonly HttpListener _listener = new(); 
     public readonly IocContainer IocContainer = new();
-    public readonly AppSettings Settings = new();
+    public static readonly AppSettings Settings = new();
 
     internal void ResolveDependencies()
     {

@@ -7,6 +7,7 @@ using CodeBusters.Utils;
 using MyAspHelper.Abstract;
 using MyAspHelper.Attributes;
 using MyAspHelper.Attributes.HttpMethods;
+using MyAspHelper.AuthSchemas;
 
 namespace CodeBusters.Controllers.QuizController;
 

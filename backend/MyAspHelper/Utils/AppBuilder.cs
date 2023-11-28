@@ -1,4 +1,6 @@
-﻿using MyAspHelper.Abstract.IMiddleware;
+﻿using System.Text.RegularExpressions;
+using MyAspHelper.Abstract;
+using MyAspHelper.Abstract.IMiddleware;
 using MyAspHelper.Middlewares;
 
 namespace MyAspHelper.Utils;
@@ -34,6 +36,14 @@ public class AppBuilder
     public AppBuilder WithExceptionHandlers()
     {
         _app.IocContainer.Register<IMiddleware, ExceptionHandlerMiddleware>();
+        return this;
+    }
+    
+    public AppBuilder WithDbConfiguration<TRepository>(string? connectionString = null) where TRepository : IRepository
+    {
+        connectionString ??= App.Settings["DbConnectionString"];
+        connectionString ??= "DefaultConnection";
+        TRepository.ConfigureDb(connectionString);
         return this;
     }
     
