@@ -1,10 +1,12 @@
 ﻿using System.Net;
+using MyAspHelper.Abstract;
+using MyAspHelper.Abstract.IMiddleware;
 
-namespace MyAspHelper;
+namespace MyAspHelper.Middlewares;
 
 public class MiddlewareChain
 {
-    private IMiddleware _chainStart;
+    private IMiddleware _chainStart = null!;
 
     public void ResolveContainer(IocContainer iocContainer)
     {
@@ -14,8 +16,8 @@ public class MiddlewareChain
         _chainStart = chain.First();
     }
     
-    public async Task Handle(HttpListenerRequest request, HttpListenerResponse response)
+    public async Task Handle(HttpContextResult context)
     {
-        await _chainStart.Handle(request, response);
+        await _chainStart.Handle(context);
     }
 }

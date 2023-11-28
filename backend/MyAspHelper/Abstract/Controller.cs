@@ -8,37 +8,58 @@ public class Controller
     public HttpListenerRequest Request { get; set; }
     public HttpListenerResponse Response { get; set; }
 
-    protected async Task<bool> Ok(string? text = null)
+    protected ActionResult Ok(string? text = null)
     {
-        try
-        {
-            Response.StatusCode = 200;
-            if (text is not null)
-                await Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(text));
-            return true;
-        }
-        catch (Exception e)
-        {
-            return false;
-        }
-        finally
-        {
-            Response.OutputStream.Close();
-        }
+        //TODO: Адекватно ли тут использовать Result?
+        //Вызывающий и вызываемый метод - асинхронные, а этот - синхронный
+        return SendResponse(200, text).Result;
+    }
+    
+    protected ActionResult Ok(byte[] data, string contentType)
+    {
+        return SendResponse(200, contentType, data).Result;
     }
 
-    protected async Task<bool> BadRequest(string? text = null)
+    protected ActionResult BadRequest(string? text = null)
     {
+        return SendResponse(400, text).Result;
+    }
+    
+    protected ActionResult NotFound(string? text = null)
+    {
+        return SendResponse(404, text).Result;
+    }
+    
+    protected ActionResult Unauthorized(string? text = null)
+    {
+        return SendResponse(401, text).Result;
+    }
+    
+    protected ActionResult AccessDenied(string? text = null)
+    {
+        return SendResponse(403, text).Result;
+    }
+
+    private async Task<ActionResult> SendResponse(int statusCode, string? text)
+    {
+        // Из официальной документации Microsoft:
+        // В инструкции finally блок выполняется, когда элемент управления покидает try блок.
+        // Элемент управления может покинуть try блок в результате:
+        //
+        // нормальное выполнение,
+        // выполнение оператора перехода (т. е. return, break, continueили goto) или
+        // распространение исключения из try блока.
+        // https://learn.microsoft.com/ru-ru/dotnet/csharp/language-reference/statements/exception-handling-statements#the-try-finally-statement
         try
         {
-            Response.StatusCode = 400;
+            Response.StatusCode = statusCode;
             if (text is not null)
                 await Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(text));
-            return true;
+            return new ActionResult(true);
         }
         catch (Exception e)
         {
-            return false;
+            return new ActionResult(false, e.Message);
         }
         finally
         {
@@ -46,34 +67,19 @@ public class Controller
         }
     }
     
-    protected async Task NotFound(string? text = null)
-    {
-        Response.StatusCode = 404;
-        if (text is not null) 
-            await Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(text));
-        Response.OutputStream.Close();
-    }
-    
-    protected async Task Unauthorized(string? text = null)
-    {
-        Response.StatusCode = 401;
-        if (text is not null) 
-            await Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(text));
-        Response.OutputStream.Close();
-    }
-    
-    protected async Task<bool> AccessDenied(string? text = null)
+    private async Task<ActionResult> SendResponse(int statusCode, string contentType, byte[] data)
     {
         try
         {
-            Response.StatusCode = 403;
-            if (text is not null)
-                await Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(text));
-            return true;
+            Response.StatusCode = statusCode;
+            Response.ContentEncoding = Encoding.UTF8;
+            Response.ContentType = contentType;
+            await Response.OutputStream.WriteAsync(data);
+            return new ActionResult(true);
         }
         catch (Exception e)
         {
-            return false;
+            return new ActionResult(false, e.Message);
         }
         finally
         {

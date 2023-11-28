@@ -1,20 +1,23 @@
 ﻿using System.Net;
+using MyAspHelper.Abstract;
+using MyAspHelper.Abstract.IMiddleware;
 
-namespace MyAspHelper;
+namespace MyAspHelper.Middlewares;
 
 public class CorsConfigMiddleware : IMiddleware
 {
-    public IMiddleware? Next { get; set; }
-    public async Task Handle(HttpListenerRequest request, HttpListenerResponse response)
+    public required IMiddleware Next { get; set; }
+    public async Task Handle(HttpContextResult context)
     {
-        response.AppendHeader("Access-Control-Allow-Origin", "*");
-        response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Accept, X-Requested-With");
-        response.AddHeader("Content-type", "application/json");
-        response.AddHeader("Access-Control-Allow-Methods", "GET, POST");
-        response.AddHeader("Access-Control-Max-Age", "1728000");
-        
-        if (request.HttpMethod == "OPTIONS") response.OutputStream.Close();
-        
-        else if (Next is not null) await Next.Handle(request, response);
+        context.Response.AppendHeader("Access-Control-Allow-Origin", "*");
+        context.Response.AddHeader("Access-Control-Allow-Headers", "Content-Type, Accept, X-Requested-With");
+        context.Response.AddHeader("Content-type", "application/json");
+        context.Response.AddHeader("Access-Control-Allow-Methods", "GET, POST");
+        context.Response.AddHeader("Access-Control-Max-Age", "1728000");
+
+        if (context.Request.HttpMethod == "OPTIONS") 
+            await context.SendResponse(null, null);
+        else 
+            await Next.Handle(context);
     }
 }

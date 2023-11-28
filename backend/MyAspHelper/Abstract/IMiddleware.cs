@@ -1,9 +1,9 @@
 ﻿using System.Net;
 
-namespace MyAspHelper;
+namespace MyAspHelper.Abstract.IMiddleware;
 
 public interface IMiddleware
 {
-    public IMiddleware? Next { get; set; }
-    public Task Handle(HttpListenerRequest request, HttpListenerResponse response);
+    public IMiddleware Next { get; set; }
+    public Task Handle(HttpContextResult context);
 }

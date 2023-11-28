@@ -2,6 +2,9 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using MyAspHelper.Abstract;
+using MyAspHelper.Middlewares;
+using MyAspHelper.Utils;
 
 namespace MyAspHelper;
 
@@ -10,37 +13,31 @@ public class App
     private readonly MiddlewareChain _chain = new();
     private readonly HttpListener _listener = new(); 
     public readonly IocContainer IocContainer = new();
+    public readonly AppSettings Settings = new();
+
+    internal void ResolveDependencies()
+    {
+        _chain.ResolveContainer(IocContainer);
+        //Здесь также можно резолвить любые зависимости,
+        //которые могут понадобится в работе проекта
+    }
 
     private async Task HandleIncomingRequests()
     { 
         while (_listener.IsListening)
         {
-            var context = await _listener.GetContextAsync();
-            var req = context.Request;
-            var rep = context.Response;
+            var context = new HttpContextResult(await _listener.GetContextAsync());
 
-            await _chain.Handle(req, rep);
+            await _chain.Handle(context);
         }
-    }
-
-    private static string GetUrl()
-    {
-        using var jsonReader = new StreamReader("../../../appsettings.json");
-        var json = jsonReader.ReadToEnd();
-        var options = JsonNode.Parse(json);
-
-        var urlInfo = options!["ApplicationUrl"];
-        if (urlInfo is null || urlInfo.GetValue<string>() is not string url)
-            throw new ArgumentNullException("Url not set");
-
-        return url;
     }
 
     public void Start()
     {
-        var url = GetUrl();
+        var url = Settings["ApplicationUrl"];
+        if (url is null) 
+            throw new ArgumentNullException($"Url not set");
         
-        _chain.ResolveContainer(IocContainer);
         _listener.Prefixes.Add(url);
         _listener.Start();
         Console.WriteLine($"Server started\nListening on {url}...");

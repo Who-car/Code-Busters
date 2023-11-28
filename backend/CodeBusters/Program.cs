@@ -1,17 +1,16 @@
-﻿using CodeBusters.Methods;
-using CodeBusters.Models;
-using MyAspHelper;
-using MyOrmHelper;
+﻿using CodeBusters.Controllers;
+using MyAspHelper.Utils;
 
 //TODO: Расставить комментарии адекватные
 
 var builder = new AppBuilder();
 var app = builder
+    .WithRouteMapping()
     .WithCorsPolicy()
-    .WithApiCheck()
+    .WithHttpMethodCheck()
+    .WithExceptionHandlers()
     .WithAuthorization()
-    .WithAttributeRoutes()
-    .WithPreStart(Methods.OnStart)
+    .WithPreStart(StartUp.OnStart)
     .Build();
 
 app.Start();

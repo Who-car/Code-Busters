@@ -1,17 +1,29 @@
-﻿using System.Net;
+﻿using System.Linq.Expressions;
+using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using MyAspHelper.Abstract;
+using MyAspHelper.Abstract.IMiddleware;
 using MyAspHelper.Attributes;
+using MyAspHelper.Utils;
 
-namespace MyAspHelper.Utils;
-
-public static class HttpListenerRequestExtension
+namespace MyAspHelper.Middlewares;
+//TODO: Причесать эту срань господню (Кисловка говорит что LINQ это слишком медленно)
+public class MapMiddleware : IMiddleware
 {
     private static Dictionary<Type, MethodInfo[]>? _controllers;
-
-    public static (MethodInfo? method, object[] parameters, Type? controllerType) 
-        GetEndpoint(this HttpListenerRequest request)
+    public required IMiddleware Next { get; set; }
+    public async Task Handle(HttpContextResult context)
+    {
+        if (context.TargetMethod == null
+            && context.Controller == null)
+            await GetEndpoint(context);
+        
+        await Next.Handle(context);
+    }
+    
+    
+    private async Task GetEndpoint(HttpContextResult context)
     {
         _controllers ??= Assembly
             .GetEntryAssembly()!
@@ -24,7 +36,10 @@ public static class HttpListenerRequestExtension
                     .Where(m => m.GetCustomAttributes(typeof(RouteAttribute), false).Length > 0)
                     .ToArray());
 
-        var parts = request.Url!.LocalPath.Split('/');
+        var parts = context.Request.Url!.LocalPath
+            .Split('/')
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToArray();
         
         var controller = 
             _controllers
@@ -37,12 +52,15 @@ public static class HttpListenerRequestExtension
         Type? instance = null;
 
         if (controller.Equals(default(KeyValuePair<Type, MethodInfo[]>)))
-            return (targetMethod, parameters.ToArray(), instance);
+            return;
         
         foreach (var methodInfo in controller.Value)
         {
             var mPath = methodInfo.GetCustomAttribute<RouteAttribute>()!.Path;
-            var mParts = mPath.Split('/');
+            var mParts = mPath
+                .Split('/')
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToArray();
             var isMatch = true;
                 
             if (parts.Length != mParts.Length)
@@ -69,7 +87,11 @@ public static class HttpListenerRequestExtension
                 else
                 {
                     isMatch = mParts[i].Equals(parts[i]);
-                    if (!isMatch) break;
+                    if (!isMatch)
+                    {
+                        parameters.Clear();
+                        break;
+                    }
                 }
             }
                 
@@ -78,7 +100,19 @@ public static class HttpListenerRequestExtension
             break;
         }
 
-        return (targetMethod, parameters.ToArray(), controller.Key);
+        if (targetMethod == null)
+        {
+            await context.SendResponse(404, "No corresponding method found");
+            return;
+        }
+        
+        var controllerExpr = Expression.MemberInit(Expression.New(controller.Key));
+        var targetController = Expression.Lambda<Func<Controller>>(controllerExpr).Compile()();
+        targetController.Request = context.Request;
+        targetController.Response = context.Response;
+        context.TargetMethod = targetMethod;
+        context.Parameters = parameters.ToArray();
+        context.Controller = targetController;
     }
 
     private static void TryParse(string type, string value, out object? parsed)

@@ -27,7 +27,7 @@ public static class TypeExtension
             "TimeSpan" => "interval",
             "Json" => "jsonb",
             "JsonArray" => "jsonb[]",
-            _ => throw new NotSupportedException()
+            _ => type.Name.ToLower()
         };
         return type.IsArray ? string.Concat(name, "[]") : name;
     }

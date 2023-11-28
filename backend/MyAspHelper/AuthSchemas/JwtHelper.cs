@@ -10,6 +10,7 @@ public static class JwtHelper<T> where T: IAuthorizable
 {
     public static string GenerateToken(T instanse)
     {
+        //TODO: считывать данные из App.Settings
         using var jsonReader = new StreamReader("../../../appsettings.json");
         var jwtSecret = JsonNode.Parse(jsonReader.ReadToEnd())!["JwtSecret"]?.GetValue<string>();
 
@@ -21,7 +22,7 @@ public static class JwtHelper<T> where T: IAuthorizable
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[] { new Claim("id", instanse.Id.ToString()) }),
-            Expires = DateTime.UtcNow.AddDays(1),
+            Expires = DateTime.UtcNow.AddDays(12),
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
         };
         var token = tokenHandler.CreateToken(tokenDescriptor);

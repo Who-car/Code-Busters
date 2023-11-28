@@ -1,11 +1,14 @@
 ﻿using System.Collections;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Microsoft.VisualBasic;
 using Npgsql;
 
 namespace MyOrmHelper;
@@ -56,19 +59,42 @@ public class OrmHelper<T>
         command.CommandText = commandText;
         return await command.ExecuteNonQueryAsync(token);
     }
+    
+    public async Task<int> CreateEnumAsync(Type enumType, CancellationToken token)
+    {
+        if (!CheckConnection() || !enumType.IsEnum) return -1;
 
-    public async Task<List<TReturn>> SelectAsync<TReturn>(string cursor, int? limit, CancellationToken token) 
+        var enumTypeName = ConvertCase(enumType.Name);
+
+        var checkTypeExistsCommand = _connection.CreateCommand();
+        checkTypeExistsCommand.CommandText = $"SELECT EXISTS(SELECT 1 FROM pg_type WHERE typname = '{enumTypeName}')";
+    
+        var typeExists = (bool) (await checkTypeExistsCommand.ExecuteScalarAsync(token))!;
+    
+        if (typeExists) return 0;
+
+        var enumValues = enumType.GetEnumNames().Select(s => $"'{s}'");
+    
+        var createTypeCommand = _connection.CreateCommand();
+        createTypeCommand.CommandText = $"CREATE TYPE {enumTypeName} AS ENUM({string.Join(", ", enumValues)})";
+    
+        return await createTypeCommand.ExecuteNonQueryAsync(token);
+    }
+
+    public async Task<List<TReturn>> SelectAsync<TReturn>(string cursor, int? limit, CancellationToken token, string? tableName = null) 
         where TReturn: new()
     {
         if (!CheckConnection()) 
             throw new ChannelClosedException();
+
+        tableName ??= _tableName;
         
         var command = _connection.CreateCommand();
         command.CommandText = limit is null
-            ? $"SELECT * FROM {_tableName}"
-            : $"SELECT * FROM {_tableName} WHERE id > '{cursor}' ORDER BY id LIMIT {limit}";
+            ? $"SELECT * FROM {tableName}"
+            : $"SELECT * FROM {tableName} WHERE id > '{cursor}' ORDER BY id LIMIT {limit}";
     
-        var reader = command.ExecuteReader();
+        var reader = await command.ExecuteReaderAsync(token);
         var items = new List<TReturn>();
     
         while (await reader.ReadAsync(token))
@@ -78,13 +104,14 @@ public class OrmHelper<T>
             for (var i = 0; i < reader.FieldCount; i++)
             {
                 var fieldName = reader.GetName(i);
-                var property = _properties.FirstOrDefault(p => p.Name == fieldName);
-            
-                if (property != null)
-                {
-                    var value = reader.GetValue(i);
-                    property.SetValue(item, value);
-                }
+                var property = _properties.FirstOrDefault(p => ConvertCase(p.Name) == fieldName);
+
+                if (property == null) continue;
+                
+                var value = property.PropertyType == typeof(JsonArray) 
+                        ? JsonSerializer.Deserialize(reader.GetValue(i).ToString(), property.PropertyType) 
+                        : reader.GetValue(i);
+                property.SetValue(item, value);
             }
         
             items.Add(item);
@@ -121,11 +148,14 @@ public class OrmHelper<T>
                 
                 try
                 {
-                    p.SetValue(instance, reader[columnName]);
+                    p.SetValue(instance,
+                        p.PropertyType == typeof(JsonArray)
+                            ? JsonSerializer.Deserialize(reader[columnName].ToString(), p.PropertyType)
+                            : reader[columnName]);
                 }
-                catch (Exception e)
+                catch
                 {
-                    Console.WriteLine(e);
+                    // ignored
                 }
             });
 
@@ -137,19 +167,8 @@ public class OrmHelper<T>
         if (!CheckConnection()) return -1;
         tableName ??= _tableName;
         
-        var columns = new List<string>();
-        var checkCommand = _connection.CreateCommand();
-        var checkCommandText = $"select column_name from information_schema.columns where " +
-                               $"table_schema='public' and " +
-                               $"table_name='{tableName}'";
-        checkCommand.CommandText = checkCommandText;
-        await using var reader = await checkCommand.ExecuteReaderAsync(token);
-
-        if (!reader.HasRows) return 0;
-        while (await reader.ReadAsync(token))
-            columns.Add(reader[0].ToString()!);
-
-        await RestoreConnectionAsync(token);
+        var columns = _properties.Select(p => ConvertCase(p.Name));
+        
         var values = new List<object>();
         var insert = $"insert into {tableName}(" +
                      $"{string.Join(",", _properties
@@ -238,17 +257,13 @@ public class OrmHelper<T>
     private object? GetMyValue(PropertyInfo p, T entity)
     {
         var value = p.GetValue(entity);
-        var columnType = p.GetCustomAttribute<ColumnAttribute>();
         
         if (value is null) 
             return null;
         
-        if (columnType is not null && columnType.TypeName == "jsonb")
-            return JsonSerializer.Serialize(value);
-        
         return p.PropertyType.IsArray 
             ? $"{{{string.Join(",", ((Array)value).OfType<object>())}}}" 
-            : value;
+            : Convert.ToString(value, CultureInfo.InvariantCulture);
     }
 
     private string ConvertCase(string input)

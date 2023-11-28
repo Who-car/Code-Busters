@@ -2,7 +2,7 @@
 using MyOrmHelper;
 using Npgsql;
 
-namespace CodeBusters.Database;
+namespace CodeBusters.Repository;
 
 public class DbContext
 {
@@ -13,12 +13,28 @@ public class DbContext
                                             "Database=CodeBusters;" +
                                             "Include Error Detail = true;";
     private readonly NpgsqlConnection _connection = new(ConnectionString);
+    private readonly NpgsqlDataSource _dataSource;
+
+    public DbContext()
+    {
+        var builder = new NpgsqlDataSourceBuilder(ConnectionString);
+        builder.MapEnum<Difficulty>();
+        _dataSource = builder.Build();
+    }
 
     public async Task CreateTableAsync<T>(string tableName, CancellationToken token, Column[] columns)
     {
         await _connection.OpenAsync(token);
         var orm = new OrmHelper<T>(_connection);
         await orm.CreateTableAsync(tableName, token, columns);
+        await _connection.CloseAsync();
+    }
+
+    public async Task CreateEnumAsync(Type enumType, CancellationToken token)
+    {
+        await _connection.OpenAsync(token);
+        var orm = new OrmHelper<Difficulty>(_connection);
+        await orm.CreateEnumAsync(enumType, token);
         await _connection.CloseAsync();
     }
 
@@ -57,12 +73,12 @@ public class DbContext
 
         return user;
     }
-    //TODO: где хранить курсор?
-    public async Task<List<Quiz>> GetQuizzesAsync(int count, CancellationToken token)
+    
+    public async Task<List<Quiz>> GetQuizzesAsync(Guid cursor, int count, CancellationToken token)
     {
         await _connection.OpenAsync(token);
         var orm = new OrmHelper<Quiz>(_connection);
-        var quizzes = await orm.SelectAsync<Quiz>("", count, token);
+        var quizzes = await orm.SelectAsync<Quiz>(cursor.ToString(), count, token, "quizzes");
         await _connection.CloseAsync();
     
         return quizzes;
@@ -72,20 +88,20 @@ public class DbContext
     {
         await _connection.OpenAsync(token);
         var orm = new OrmHelper<Quiz>(_connection);
-        var quiz = await orm.FindAsync<Quiz>(new List<(string column, object value)> {("id", id)}, token);
+        var quiz = await orm.FindAsync<Quiz>(new List<(string column, object value)> {("id", id)}, token, "quizzes");
         await _connection.CloseAsync();
     
         return quiz;
     }
-    //TODO: где хранить курсор?
+    
     public async Task<List<Comment>> GetCommentsAsync(Guid id, CancellationToken token)
     {
         await _connection.OpenAsync(token);
         var orm = new OrmHelper<Comment>(_connection);
-        var quizzes = await orm.SelectAsync<Comment>("", null, token);
+        var comments = await orm.SelectAsync<Comment>("", null, token);
         await _connection.CloseAsync();
     
-        return quizzes;
+        return comments;
     }
     
     public async Task AddCommentAsync(Comment comment, CancellationToken token)

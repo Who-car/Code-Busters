@@ -1,4 +1,7 @@
-﻿namespace MyAspHelper;
+﻿using System.Linq.Expressions;
+using MyAspHelper.Abstract;
+
+namespace MyAspHelper;
 
 public class IocContainer
 {
@@ -36,8 +39,8 @@ public class IocContainer
         
         foreach (var type in implementationsType)
         {
-            if (Activator.CreateInstance(type) is not TInterface instance)
-                throw new NullReferenceException();
+            var instanceExpression = Expression.MemberInit(Expression.New(type));
+            var instance = Expression.Lambda<Func<TInterface>>(instanceExpression).Compile()();
             instances.Add(instance);
         }
         

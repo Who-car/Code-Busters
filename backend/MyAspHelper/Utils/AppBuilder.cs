@@ -1,4 +1,7 @@
-﻿namespace MyAspHelper;
+﻿using MyAspHelper.Abstract.IMiddleware;
+using MyAspHelper.Middlewares;
+
+namespace MyAspHelper.Utils;
 
 public class AppBuilder
 {
@@ -10,15 +13,9 @@ public class AppBuilder
         return this;
     }
 
-    public AppBuilder WithApiCheck()
+    public AppBuilder WithRouteMapping()
     {
-        _app.IocContainer.Register<IMiddleware, ApiCheckMiddleware>();
-        return this;
-    }
-
-    public AppBuilder WithAttributeRoutes()
-    {
-        _app.IocContainer.Register<IMiddleware, AttributeMapMiddleware>();
+        _app.IocContainer.Register<IMiddleware, MapMiddleware>();
         return this;
     }
 
@@ -28,20 +25,28 @@ public class AppBuilder
         return this;
     }
     
+    public AppBuilder WithHttpMethodCheck()
+    {
+        _app.IocContainer.Register<IMiddleware, HttpMethodMiddleware>();
+        return this;
+    }
+    
+    public AppBuilder WithExceptionHandlers()
+    {
+        _app.IocContainer.Register<IMiddleware, ExceptionHandlerMiddleware>();
+        return this;
+    }
+    
     public AppBuilder WithPreStart(Func<Task> func)
     {
         func.Invoke();
         return this;
     }
 
-    public AppBuilder WithPreStart(Func<object[]?, Task> func, object[]? parameters)
-    {
-        func.Invoke(parameters);
-        return this;
-    }
-
     public App Build()
     {
+        _app.IocContainer.Register<IMiddleware, FinalMiddleware>();
+        _app.ResolveDependencies();
         return _app;
     }
 }
