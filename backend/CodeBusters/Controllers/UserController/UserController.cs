@@ -3,6 +3,7 @@ using System.Text.Json;
 using CodeBusters.Models;
 using CodeBusters.Repository;
 using CodeBusters.Utils;
+using MyAspHelper;
 using MyAspHelper.Abstract;
 using MyAspHelper.Attributes;
 using MyAspHelper.Attributes.HttpMethods;
@@ -164,7 +165,6 @@ public class UserController : Controller
         }
     }
     
-    //TODO: починить путь (возможно относительно корневой папки системы?)
     [HttpPost]
     [Authorize]
     [Route("api/User/{id:guid}/avatar/post")]
@@ -181,16 +181,10 @@ public class UserController : Controller
         }
 
         var imageData = ms.ToArray();
+        
+        await File.WriteAllBytesAsync(Path.Combine(App.Settings["StaticResourcesPath"]!, "UserAvatars", $"{id}.jpg"), imageData, cancellationToken);
 
-        Directory.CreateDirectory("avatars");
-        await File.WriteAllBytesAsync($"avatars/{id}.jpg", imageData, cancellationToken);
-
-        return Ok(
-            "Avatar added",
-            new SuccessResponseDto()
-            {
-                Result = true
-            });
+        return Ok("Avatar added");
     }
 
     [HttpGet]
@@ -202,7 +196,7 @@ public class UserController : Controller
         byte[] image;
         try
         {
-            image = await File.ReadAllBytesAsync($"avatars/{id}.jpg", cancellationToken);
+            image = await File.ReadAllBytesAsync(Path.Combine(App.Settings["StaticResourcesPath"]!, "UserAvatars", $"{id}.jpg"), cancellationToken);
         }
         catch (FileNotFoundException e)
         {

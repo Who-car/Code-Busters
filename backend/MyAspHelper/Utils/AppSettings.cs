@@ -8,7 +8,7 @@ public class AppSettings
 
     public AppSettings()
     {
-        using var jsonReader = new StreamReader("../../../appsettings.json");
+        using var jsonReader = new StreamReader("appsettings.json");
         var json = jsonReader.ReadToEnd();
         _json = JsonNode.Parse(json)!;
     }
