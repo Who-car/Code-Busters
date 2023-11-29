@@ -150,7 +150,6 @@ public class UserController : Controller
         var db = new DbContext();
         try
         {
-            //TODO: бд должна выполнять left join user'а на его квизы
             var user = await db.GetUserByIdAsync(userId, cancellationToken);
             return Ok("", user);
         }

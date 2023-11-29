@@ -21,7 +21,6 @@ public class AuthMiddleware : IMiddleware
     // Здесь используется, чтобы игнорировать предупреждения компилятора
     public required IMiddleware Next { get; set; }
     
-    //TODO: токен должен храниться в cookies
     public async Task Handle(HttpContextResult context)
     {
         Console.WriteLine();

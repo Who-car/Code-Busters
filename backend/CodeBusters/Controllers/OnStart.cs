@@ -13,7 +13,7 @@ public static class StartUp
 
         await db.CreateEnumAsync(typeof(Difficulty), new CancellationToken());
 
-        await db.CreateTableAsync<User>(tableName: "users", new CancellationToken(), new[]
+        await db.CreateTableAsync(tableName: "users", new CancellationToken(), new[]
         {
             new Column("id", typeof(Guid), true),
             new Column("name", typeof(string)),
@@ -21,7 +21,7 @@ public static class StartUp
             new Column("password", typeof(string))
         });
 
-        await db.CreateTableAsync<Quiz>(tableName: "quizzes", new CancellationToken(), new[]
+        await db.CreateTableAsync(tableName: "quizzes", new CancellationToken(), new[]
         {
             new Column("id", typeof(Guid), true),
             new Column("topic", typeof(string)),
@@ -30,7 +30,7 @@ public static class StartUp
             new Column("questions", typeof(JsonArray))
         });
 
-        await db.CreateTableAsync<Comment>(tableName: "comments", new CancellationToken(), new[]
+        await db.CreateTableAsync(tableName: "comments", new CancellationToken(), new[]
         {
             new Column("id", typeof(Guid), true),
             new Column("text", typeof(string)),

@@ -8,8 +8,7 @@ public class Quiz
     public Guid Id { get; set; }
     public Guid AuthorId { get; set; }
     public string? Topic { get; set; }
-    //TODO:Difficulty Difficulty
-    public string Difficulty { get; set; }
+    public Difficulty Difficulty { get; set; }
     public JsonArray Questions { get; set; }
 }
 

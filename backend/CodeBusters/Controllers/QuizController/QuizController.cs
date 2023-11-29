@@ -70,7 +70,6 @@ public class QuizController : Controller
             });
     }
     
-    //TODO: Не должен возвращать список ответов-вопросов
     [HttpGet]
     [Route("/api/Quiz/get/{count:int}")]
     public async Task<ActionResult> GetAllQuizzes(int count)
