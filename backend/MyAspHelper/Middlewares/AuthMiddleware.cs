@@ -31,6 +31,8 @@ public class AuthMiddleware : IMiddleware
                 await context.SendResponse(401, "Unauthorized");
                 return;
             }
+            
+            
         }
 
         await Next.Handle(context);

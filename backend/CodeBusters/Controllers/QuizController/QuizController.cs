@@ -1,9 +1,12 @@
 ﻿using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CodeBusters.DbModels;
 using CodeBusters.Models;
 using CodeBusters.Repository;
 using CodeBusters.Utils;
+using MyAspHelper;
 using MyAspHelper.Abstract;
 using MyAspHelper.Attributes;
 using MyAspHelper.Attributes.HttpMethods;
@@ -13,8 +16,7 @@ namespace CodeBusters.Controllers.QuizController;
 
 public class QuizController : Controller
 {
-    // TODO: контекст должен обновляться только при наличии флага
-    private readonly QuizContext _context = new QuizContext();
+    private static QuizContext QuizContext = new QuizContext();
     
     [HttpPost]
     [Authorize]
@@ -24,7 +26,7 @@ public class QuizController : Controller
         var cancellationToken = new CancellationToken();
         var token = ContextResult.AuthToken;
         var userId = JwtHelper<User>.ValidateToken(token!);
-
+        
         if (userId == Guid.Empty)
             return BadRequest("Invalid token",
                 new ErrorResponseDto()
@@ -59,7 +61,6 @@ public class QuizController : Controller
             
         var dbContext = new DbContext();
         quiz.Id = Guid.NewGuid();
-        quiz.AuthorId = userId;
         await dbContext.AddNewQuizAsync(quiz, cancellationToken);
 
         return Ok(
@@ -71,14 +72,29 @@ public class QuizController : Controller
     }
     
     [HttpGet]
-    [Route("/api/Quiz/get/{count:int}")]
-    public async Task<ActionResult> GetAllQuizzes(int count)
+    [Route("/api/Quiz/get")]
+    public async Task<ActionResult> GetAllQuizzes()
     {
         var cancellationToken = new CancellationToken();
         var db = new DbContext();
-        var quizzes = await db.GetQuizzesAsync(_context.LastSentQuizId, count, cancellationToken);
+        var quizzes = await db.GetQuizzesAsync(QuizContext.LastSentQuizId, QuizContext.Count, cancellationToken);
         if (quizzes.Count > 0)
-            _context.LastSentQuizId = quizzes.Last().Id;
+            QuizContext.LastSentQuizId = quizzes.Last().Id;
+        return Ok("", quizzes);
+    }
+    
+    [HttpGet]
+    [Route("/api/Quiz/get/{count:int}")]
+    public async Task<ActionResult> GetAllQuizzesFirstTime(int count)
+    {
+        var cancellationToken = new CancellationToken();
+        var db = new DbContext();
+        QuizContext = new QuizContext();
+        var quizzes = await db.GetQuizzesAsync(QuizContext.LastSentQuizId, count, cancellationToken);
+        if (quizzes.Count <= 0)
+            return Empty();
+        QuizContext.LastSentQuizId = quizzes.Last().Id;
+        QuizContext.Count = count;
         return Ok("", quizzes);
     }
     
@@ -90,7 +106,25 @@ public class QuizController : Controller
         
         var db = new DbContext();
         var quiz = await db.GetQuizAsync(id, cancellationToken);
+        
         return Ok("", quiz);
+    }
+    
+    [HttpGet]
+    [Route("api/Quiz/{name:string}/avatar/get")]
+    public async Task<ActionResult> GetQuizAvatar(string name)
+    {
+        var cancellationToken = new CancellationToken();
+        try
+        {
+            var image = await File.ReadAllBytesAsync(Path.Combine(App.Settings["StaticResourcesPath"]!, "QuizAvatars", $"{name}.jpg"), cancellationToken);
+            return Ok(image, "image/jpeg");
+        }
+        catch (FileNotFoundException e)
+        {
+            var def = await File.ReadAllBytesAsync(Path.Combine(App.Settings["StaticResourcesPath"]!, "QuizAvatars", "Default.png"));
+            return Empty(def, "image/png");
+        }
     }
 
     [HttpGet]
@@ -144,5 +178,12 @@ public class QuizController : Controller
 
         return Ok();
     }
-    //TODO: хранить картинки квиза
+    
+    [HttpPost]
+    [Authorize]
+    [Route("api/Quiz/{name:string}")]
+    public async Task<ActionResult> PostAvatar(string name)
+    {
+        return Multipart("QuizAvatars", name);
+    }
 }

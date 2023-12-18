@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Nodes;
+using CodeBusters.DbModels;
 using CodeBusters.Models;
 using CodeBusters.Repository;
 using MyOrmHelper;
@@ -12,6 +13,7 @@ public static class StartUp
         var db = new DbContext();
 
         await db.CreateEnumAsync(typeof(Difficulty), new CancellationToken());
+        await db.CreateEnumAsync(typeof(Status), new CancellationToken());
 
         await db.CreateTableAsync(tableName: "users", new CancellationToken(), new[]
         {
@@ -25,8 +27,9 @@ public static class StartUp
         {
             new Column("id", typeof(Guid), true),
             new Column("topic", typeof(string)),
-            new Column("author id", typeof(Guid), "users", "id"),
+            new Column("author", typeof(string)),
             new Column("difficulty", typeof(Difficulty)),
+            new Column("description", typeof(string)),
             new Column("questions", typeof(JsonArray))
         });
 
@@ -37,6 +40,14 @@ public static class StartUp
             new Column("rating", typeof(double)),
             new Column("author id", typeof(Guid), "users", "id"),
             new Column("quiz id", typeof(Guid), "quizzes", "id")
+        });
+
+        await db.CreateTableAsync(tableName: "friends", new CancellationToken(), new[]
+        {
+            new Column("id", typeof(Guid), true),
+            new Column("user a", typeof(Guid)),
+            new Column("user b", typeof(Guid)),
+            new Column("status", typeof(Status))
         });
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using CodeBusters.DbModels;
 using CodeBusters.Models;
 using FluentValidation;
 

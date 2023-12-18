@@ -1,4 +1,6 @@
-﻿namespace CodeBusters.Models;
+﻿using CodeBusters.DbModels;
+
+namespace CodeBusters.Models;
 
 public class QuizWithAuthorInfo
 {

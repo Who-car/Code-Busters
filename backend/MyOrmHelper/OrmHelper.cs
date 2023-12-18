@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using System.Threading.Channels;
 using Npgsql;
 
@@ -99,7 +100,9 @@ public class OrmHelper
         return items;
     }
     
-    public async Task<TReturn> FindAsync<TReturn>(CancellationToken token, string tableName, IEnumerable<(string column, object value)> parameters) 
+    // TODO: входящие аргументы переделать на словарь (а лучше на expression)
+    // TODO: sql injections
+    public async Task<List<TReturn>> FindAsync<TReturn>(CancellationToken token, string tableName, IEnumerable<(string column, object value)> parameters, bool returnAllFound = false) 
         where TReturn: new()
     {
         if (!CheckConnection()) throw new ChannelClosedException();
@@ -112,13 +115,37 @@ public class OrmHelper
         command.CommandText = commandText;
         await using var reader = await command.ExecuteReaderAsync(token);
 
-        if (!reader.HasRows || !await reader.ReadAsync(token)) 
+        if (!reader.HasRows) 
             throw new KeyNotFoundException($"No {typeof(TReturn).Name} ({querySet}) found");
         
         if (!_properties.ContainsKey(typeof(TReturn)))
             _properties.Add(typeof(TReturn), typeof(TReturn).GetProperties());
+
+        var results = new List<TReturn>();
+
+        if (returnAllFound)
+        {
+            while (await reader.ReadAsync(token))
+            {
+                var item = new TReturn();
         
-        var item = new TReturn();
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    var fieldName = reader.GetName(i);
+                    var property = _properties[typeof(TReturn)].FirstOrDefault(p => p.Name.ToSql() == fieldName);
+
+                    if (property == null) continue;
+
+                    var value = SqlValueConverter.ConvertFromSql(property, reader.GetValue(i));
+                    property.SetValue(item, value);
+                }
+                results.Add(item);
+            }
+            return results;
+        }
+        // TODO: вынести в отдельную функцию
+        var instance = new TReturn();
+        await reader.ReadAsync(token);
         
         for (var i = 0; i < reader.FieldCount; i++)
         {
@@ -128,10 +155,10 @@ public class OrmHelper
             if (property == null) continue;
 
             var value = SqlValueConverter.ConvertFromSql(property, reader.GetValue(i));
-            property.SetValue(item, value);
+            property.SetValue(instance, value);
         }
-
-        return item;
+        results.Add(instance);
+        return results;
     }
     
     public async Task<int> InsertAsync<T>(CancellationToken token, string tableName, T entity)
@@ -153,6 +180,36 @@ public class OrmHelper
         }
         
         var commandText = $"insert into {tableName} ({string.Join(",", columns)}) values('{string.Join("','", values)}')";
+
+        var command = _connection.CreateCommand();
+        command.CommandText = commandText;
+        return await command.ExecuteNonQueryAsync(token);
+    }
+    
+    public async Task<int> UpdateAsync<T>(CancellationToken token, string tableName, T entity)
+    {
+        if (!CheckConnection()) return -1;
+
+        var query = new List<string>(); 
+        var id = "";
+        
+        if (!_properties.ContainsKey(typeof(T)))
+            _properties.Add(typeof(T), typeof(T).GetProperties());
+        
+        foreach (var propertyInfo in _properties[typeof(T)])
+        {
+            var value = SqlValueConverter.ConvertToSql(propertyInfo, entity);
+            if (value is null) continue;
+            if (propertyInfo.Name.ToSql().Equals("id"))
+            {
+                id = value;
+                continue;
+            }
+            query.Add($"{propertyInfo.Name.ToSql()} = '{value}'");
+        }
+
+        var constraintText = string.IsNullOrEmpty(id) ? "" : $"where id = '{id}'";
+        var commandText = $"update {tableName} set {string.Join(", ", query)}{constraintText}";
 
         var command = _connection.CreateCommand();
         command.CommandText = commandText;
@@ -195,13 +252,14 @@ public class OrmHelper
         return results;
     }
 
+    // TODO: сложные логические запросы, включая && и ||
     private string ParseJoinCondition<TLeft, TRight>(Expression<Func<TLeft, TRight, bool>> joinCondition)
     {
         var body = (BinaryExpression)joinCondition.Body;
         var left = (MemberExpression)body.Left;
         var right = (MemberExpression)body.Right;
 
-        return $"{typeof(TLeft).Name}s.{left.Member.Name} = {typeof(TRight).Name}es.{right.Member.Name}";
+        return $"{typeof(TLeft).Name.ToSql()}s.{left.Member.Name.ToSql()} = {typeof(TRight).Name.ToSql()}es.{right.Member.Name.ToSql()}";
     }
     
     private string ParseConstraints<TLeft>(Expression<Func<TLeft, bool>>? constraint)
@@ -213,7 +271,7 @@ public class OrmHelper
         var left = (MemberExpression)body.Left;
         var right = (MemberExpression)body.Right;
 
-        return $"{typeof(TLeft).Name}s.{left.Member.Name} = {right}";
+        return $" where {typeof(TLeft).Name.ToSql()}s.{left.Member.Name.ToSql()} = {right}";
     }
     
     private bool CheckConnection()

@@ -1,14 +1,15 @@
 ﻿using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace CodeBusters.Models;
+namespace CodeBusters.DbModels;
 
 public class Quiz
 {
     public Guid Id { get; set; }
-    public Guid AuthorId { get; set; }
+    public string Author { get; set; }
     public string? Topic { get; set; }
     public Difficulty Difficulty { get; set; }
+    public string Description { get; set; }
     public JsonArray Questions { get; set; }
 }
 

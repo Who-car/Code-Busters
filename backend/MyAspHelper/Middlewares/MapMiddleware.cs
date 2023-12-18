@@ -22,7 +22,7 @@ public class MapMiddleware : IMiddleware
             await context.SendResponse(404, "No corresponding method found");
     }
     
-    private async Task GetEndpoint(HttpContextResult context)
+    private Task GetEndpoint(HttpContextResult context)
     {
         _controllers ??= Assembly
             .GetEntryAssembly()!
@@ -51,7 +51,7 @@ public class MapMiddleware : IMiddleware
         Type? instance = null;
 
         if (controller.Equals(default(KeyValuePair<Type, MethodInfo[]>)))
-            return;
+            return Task.CompletedTask;
         
         foreach (var methodInfo in controller.Value)
         {
@@ -75,7 +75,11 @@ public class MapMiddleware : IMiddleware
                     TryParse(type, value, out var parsed);
 
                     if (parsed is null)
-                        throw new ArgumentException($"Could not parse value {value} to the type {type}");
+                    {
+                        isMatch = false;
+                        parameters.Clear();
+                        break;
+                    }
                     parameters.Add(parsed);
                 }
                 else if (Regex.IsMatch(mParts[i], @"\{([^}]*)\}"))
@@ -100,7 +104,7 @@ public class MapMiddleware : IMiddleware
         }
 
         if (targetMethod == null)
-            return;
+            return Task.CompletedTask;
         
         var controllerExpr = Expression.MemberInit(Expression.New(controller.Key));
         var targetController = Expression.Lambda<Func<Controller>>(controllerExpr).Compile()();
@@ -108,6 +112,7 @@ public class MapMiddleware : IMiddleware
         context.TargetMethod = targetMethod;
         context.Parameters = parameters.ToArray();
         context.Controller = targetController;
+        return Task.CompletedTask;
     }
 
     private static void TryParse(string type, string value, out object? parsed)

@@ -1,4 +1,6 @@
-﻿using System.Runtime.InteropServices.JavaScript;
+﻿using System.Linq.Expressions;
+using System.Runtime.InteropServices.JavaScript;
+using CodeBusters.DbModels;
 using CodeBusters.Models;
 using MyAspHelper.Abstract;
 using MyOrmHelper;
@@ -50,6 +52,7 @@ public class DbContext : IRepository
         await _connection.CloseAsync();
     }
 
+    // TODO: по-хорошему first делать не надо
     public async Task<User> GetUserByEmailAsync(string email, CancellationToken token)
     {
         await _connection.OpenAsync(token);
@@ -57,36 +60,22 @@ public class DbContext : IRepository
         var user = await Orm.FindAsync<User>(token,"users", new List<(string column, object value)> {("email", email)});
         await _connection.CloseAsync();
 
-        return user;
+        return user.First();
     }
     
     public async Task<UserDto> GetUserByIdAsync(Guid id, CancellationToken token)
     {
         await _connection.OpenAsync(token);
         Orm.ConfigureConnection(_connection);
-        var userQuizzes = await Orm.LeftJoinAsync(
-            token, 
-            "users", 
-            "quizzes", 
-            (user, quiz) => user.Id == quiz.AuthorId,
-            (User user, Quiz quiz) => new QuizWithAuthorInfo() {Name = user.Name, Email = user.Email, Quiz = quiz},
-            user => user.Id == id);
+
+        var user = await Orm.FindAsync<UserDto>(token, "users", new List<(string column, object value)> {("id", id)});
+        
         await _connection.CloseAsync();
 
-        if (userQuizzes.Count == 0)
-            throw new KeyNotFoundException($"User with id {id} doesn't have quizzes");
-
-        var user = new UserDto()
-        {
-            Name = userQuizzes.FirstOrDefault()!.Name,
-            Email = userQuizzes.FirstOrDefault()!.Email,
-            Quizzes = userQuizzes.Select(q => q.Quiz).ToList()
-        };
-
-        return user;
+        return user.First();
     }
     
-    public async Task<List<QuizDto>> GetQuizzesAsync(Guid cursor, int count, CancellationToken token)
+    public async Task<List<QuizDto>> GetQuizzesAsync(Guid cursor, int? count, CancellationToken token)
     {
         await _connection.OpenAsync(token);
         Orm.ConfigureConnection(_connection);
@@ -103,7 +92,7 @@ public class DbContext : IRepository
         var quiz = await Orm.FindAsync<Quiz>(token, "quizzes", new List<(string column, object value)> {("id", id)});
         await _connection.CloseAsync();
     
-        return quiz;
+        return quiz.First();
     }
     
     public async Task<List<Comment>> GetCommentsAsync(Guid id, CancellationToken token)
@@ -136,6 +125,53 @@ public class DbContext : IRepository
         catch (KeyNotFoundException e)
         {
             return false;
+        }
+        finally
+        {
+            await _connection.CloseAsync();
+        }
+    }
+    
+    public async Task<List<Friend>> GetFriendsAsync(Guid id, CancellationToken token)
+    {
+        await _connection.OpenAsync(token);
+        Orm.ConfigureConnection(_connection);
+        var friends = await Orm.LeftJoinAsync(
+            token,
+            "friends",
+            "users",
+            (FriendRelation relation, User user) => user.Id != id,
+            (relation, user) => new Friend { Id = user.Id, Name = user.Name },
+            friendRelation => friendRelation.UserA == id || friendRelation.UserB == id);
+        await _connection.CloseAsync();
+    
+        return friends;
+    }
+    
+    public async Task AddFriendAsync(Guid id, Guid friendId, CancellationToken token)
+    {
+        await _connection.OpenAsync(token);
+        Orm.ConfigureConnection(_connection);
+        try
+        {
+            List<FriendRelation> relation;
+            relation = await Orm.FindAsync<FriendRelation>(token, "friends",
+                new List<(string column, object value)> { ("user_b", id) });
+            relation = await Orm.FindAsync<FriendRelation>(token, "friends",
+                new List<(string column, object value)> { ("user_a", id) });
+            var upd = relation.First().Status = Status.Accepted;
+            await Orm.UpdateAsync(token, "friends", upd);
+        }
+        catch (KeyNotFoundException e)
+        {
+            var relation = new FriendRelation()
+            {
+                Id = Guid.NewGuid(),
+                UserA = id,
+                UserB = friendId,
+                Status = Status.InvitationSent
+            };
+            await Orm.InsertAsync(token, "friends", relation);
         }
         finally
         {

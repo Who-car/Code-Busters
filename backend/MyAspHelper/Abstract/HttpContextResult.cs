@@ -13,7 +13,7 @@ public class HttpContextResult
     internal MethodInfo? TargetMethod { get; set; }
     internal object[]? Parameters { get; set; }
     internal object? Controller { get; set; }
-    public string? AuthToken => _context.Request.Cookies["Token"]?.Value;
+    public string? AuthToken => _context.Request.Cookies["token"]?.Value;
     public HttpListenerRequest Request => _context.Request;
     public HttpListenerResponse Response => _context.Response;
     
