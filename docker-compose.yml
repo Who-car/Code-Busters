@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  service_one:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./frontend/app 
+
+  service_two:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./backend/app 
+
